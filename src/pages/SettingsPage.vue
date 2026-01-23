@@ -28,6 +28,30 @@ const timeLayout = ref('default')
 const showCurrentTime = ref(true)
 const showTotalTime = ref(true)
 const progressShimmer = ref(false)
+const showProgressThumb = ref(true)
+const progressThumbGlow = ref(false)
+const progressTrackStyle = ref('rounded')
+const progressFillMode = ref('solid')
+const progressFillStart = ref('#22d3ee')
+const progressFillEnd = ref('#2563eb')
+const progressRenderer = ref('custom')
+const progressFillOpacity = ref(100)
+const progressShimmerDuration = ref(5)
+const progressShimmerDelay = ref(0.5)
+const isColorPickerOpen = ref(false)
+const colorPickerTarget = ref('start')
+const hsvH = ref(190)
+const hsvS = ref(85)
+const hsvV = ref(85)
+const hexInput = ref('#22d3ee')
+const rgbR = ref(34)
+const rgbG = ref(211)
+const rgbB = ref(238)
+const hsvInputH = ref(190)
+const hsvInputS = ref(85)
+const hsvInputV = ref(85)
+const svPanelRef = ref(null)
+const huePanelRef = ref(null)
 const status = ref('')
 const toastVisible = ref(false)
 const toastMessage = ref('')
@@ -38,6 +62,9 @@ const isFitOpen = ref(false)
 const isCoverFitOpen = ref(false)
 const isLyricsOpen = ref(false)
 const isTimeOpen = ref(false)
+const isTrackOpen = ref(false)
+const isFillOpen = ref(false)
+const isRendererOpen = ref(false)
 
 const fitOptions = [
   { value: 'cover', label: '覆盖（cover）' },
@@ -56,9 +83,9 @@ const alignOptions = [
   { value: 'right bottom', label: '右下' },
 ]
 const coverFitOptions = [
-  { value: 'cover', label: '覆盖（cover）' },
-  { value: 'contain', label: '包含（contain）' },
-  { value: 'fill', label: '拉伸（fill）' },
+  { value: 'cover', label: '覆盖' },
+  { value: 'contain', label: '包含' },
+  { value: 'fill', label: '拉伸' },
 ]
 const lyricsOptions = [
   { value: 'left', label: '歌词在左侧' },
@@ -67,6 +94,18 @@ const lyricsOptions = [
 const timeLayoutOptions = [
   { value: 'default', label: '已播左 / 总时右' },
   { value: 'swap', label: '已播右 / 总时左' },
+]
+const progressTrackOptions = [
+  { value: 'rounded', label: '圆角直线' },
+  { value: 'square', label: '方形直线' },
+]
+const progressFillOptions = [
+  { value: 'solid', label: '固定颜色' },
+  { value: 'gradient', label: '渐变颜色' },
+]
+const progressRendererOptions = [
+  { value: 'custom', label: '自定义进度条（推荐）' },
+  { value: 'native', label: '原生滑条（已废弃）' },
 ]
 
 const hasAudio = computed(() => Boolean(audioBlob.value))
@@ -196,6 +235,16 @@ const handleSave = async () => {
     showCurrentTime: Boolean(showCurrentTime.value),
     showTotalTime: Boolean(showTotalTime.value),
     progressShimmer: Boolean(progressShimmer.value),
+    showProgressThumb: Boolean(showProgressThumb.value),
+    progressThumbGlow: Boolean(progressThumbGlow.value),
+    progressTrackStyle: progressTrackStyle.value,
+    progressFillMode: progressFillMode.value,
+    progressFillStart: progressFillStart.value,
+    progressFillEnd: progressFillEnd.value,
+    progressRenderer: progressRenderer.value,
+    progressFillOpacity: Number(progressFillOpacity.value) || 100,
+    progressShimmerDuration: Number(progressShimmerDuration.value) || 5,
+    progressShimmerDelay: Number(progressShimmerDelay.value) || 0,
     updatedAt: Date.now(),
   }
 
@@ -247,6 +296,16 @@ const handleClear = async () => {
     showCurrentTime.value = true
     showTotalTime.value = true
     progressShimmer.value = false
+    showProgressThumb.value = true
+    progressThumbGlow.value = false
+    progressTrackStyle.value = 'rounded'
+    progressFillMode.value = 'solid'
+    progressFillStart.value = '#22d3ee'
+    progressFillEnd.value = '#2563eb'
+    progressRenderer.value = 'custom'
+    progressFillOpacity.value = 100
+    progressShimmerDuration.value = 5
+    progressShimmerDelay.value = 0.5
     status.value = '配置已清除'
     confirmClear.value = false
     if (clearTimer) {
@@ -333,6 +392,226 @@ const selectTimeLayout = (value) => {
   isTimeOpen.value = false
 }
 
+const toggleTrackStyle = () => {
+  isTrackOpen.value = !isTrackOpen.value
+}
+
+const selectTrackStyle = (value) => {
+  progressTrackStyle.value = value
+  isTrackOpen.value = false
+}
+
+const toggleFillMode = () => {
+  isFillOpen.value = !isFillOpen.value
+}
+
+const selectFillMode = (value) => {
+  progressFillMode.value = value
+  isFillOpen.value = false
+}
+
+const toggleRenderer = () => {
+  isRendererOpen.value = !isRendererOpen.value
+}
+
+const selectRenderer = (value) => {
+  progressRenderer.value = value
+  isRendererOpen.value = false
+}
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+
+const rgbToHex = (r, g, b) =>
+  `#${[r, g, b]
+    .map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0'))
+    .join('')}`
+
+const hexToRgb = (hex) => {
+  if (!hex) return null
+  const raw = hex.replace('#', '').trim()
+  const normalized = raw.length === 3
+    ? raw.split('').map((c) => c + c).join('')
+    : raw.padEnd(6, '0')
+  const r = parseInt(normalized.slice(0, 2), 16)
+  const g = parseInt(normalized.slice(2, 4), 16)
+  const b = parseInt(normalized.slice(4, 6), 16)
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null
+  return { r, g, b }
+}
+
+const rgbToHsv = (r, g, b) => {
+  const rn = r / 255
+  const gn = g / 255
+  const bn = b / 255
+  const max = Math.max(rn, gn, bn)
+  const min = Math.min(rn, gn, bn)
+  const delta = max - min
+  let h = 0
+  if (delta !== 0) {
+    if (max === rn) {
+      h = ((gn - bn) / delta) % 6
+    } else if (max === gn) {
+      h = (bn - rn) / delta + 2
+    } else {
+      h = (rn - gn) / delta + 4
+    }
+    h = Math.round(h * 60)
+    if (h < 0) h += 360
+  }
+  const s = max === 0 ? 0 : delta / max
+  const v = max
+  return { h, s: Math.round(s * 100), v: Math.round(v * 100) }
+}
+
+const hsvToRgb = (h, s, v) => {
+  const sat = s / 100
+  const val = v / 100
+  const c = val * sat
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = val - c
+  let r = 0
+  let g = 0
+  let b = 0
+  if (h >= 0 && h < 60) {
+    r = c
+    g = x
+  } else if (h < 120) {
+    r = x
+    g = c
+  } else if (h < 180) {
+    g = c
+    b = x
+  } else if (h < 240) {
+    g = x
+    b = c
+  } else if (h < 300) {
+    r = x
+    b = c
+  } else {
+    r = c
+    b = x
+  }
+  return {
+    r: Math.round((r + m) * 255),
+    g: Math.round((g + m) * 255),
+    b: Math.round((b + m) * 255),
+  }
+}
+
+const syncInputsFromHsv = () => {
+  const rgb = hsvToRgb(hsvH.value, hsvS.value, hsvV.value)
+  rgbR.value = rgb.r
+  rgbG.value = rgb.g
+  rgbB.value = rgb.b
+  hsvInputH.value = hsvH.value
+  hsvInputS.value = hsvS.value
+  hsvInputV.value = hsvV.value
+  hexInput.value = rgbToHex(rgb.r, rgb.g, rgb.b)
+}
+
+const applyColorToTarget = () => {
+  if (colorPickerTarget.value === 'start') {
+    progressFillStart.value = hexInput.value
+  } else {
+    progressFillEnd.value = hexInput.value
+  }
+}
+
+const applyHsv = (h, s, v) => {
+  hsvH.value = clamp(h, 0, 360)
+  hsvS.value = clamp(s, 0, 100)
+  hsvV.value = clamp(v, 0, 100)
+  syncInputsFromHsv()
+  applyColorToTarget()
+}
+
+const applyRgb = (r, g, b) => {
+  const clampedR = clamp(r, 0, 255)
+  const clampedG = clamp(g, 0, 255)
+  const clampedB = clamp(b, 0, 255)
+  const hsv = rgbToHsv(clampedR, clampedG, clampedB)
+  hsvH.value = hsv.h
+  hsvS.value = hsv.s
+  hsvV.value = hsv.v
+  syncInputsFromHsv()
+  applyColorToTarget()
+}
+
+const applyHex = (value) => {
+  const rgb = hexToRgb(value)
+  if (!rgb) return
+  applyRgb(rgb.r, rgb.g, rgb.b)
+}
+
+const openColorPicker = (target) => {
+  colorPickerTarget.value = target
+  const current = target === 'start' ? progressFillStart.value : progressFillEnd.value
+  const rgb = hexToRgb(current) || { r: 34, g: 211, b: 238 }
+  const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b)
+  hsvH.value = hsv.h
+  hsvS.value = hsv.s
+  hsvV.value = hsv.v
+  syncInputsFromHsv()
+  isColorPickerOpen.value = true
+}
+
+const closeColorPicker = () => {
+  isColorPickerOpen.value = false
+}
+
+const updateSvFromEvent = (event) => {
+  if (!svPanelRef.value) return
+  const rect = svPanelRef.value.getBoundingClientRect()
+  const x = clamp(event.clientX - rect.left, 0, rect.width)
+  const y = clamp(event.clientY - rect.top, 0, rect.height)
+  const s = Math.round((x / rect.width) * 100)
+  const v = Math.round(100 - (y / rect.height) * 100)
+  applyHsv(hsvH.value, s, v)
+}
+
+const updateHueFromEvent = (event) => {
+  if (!huePanelRef.value) return
+  const rect = huePanelRef.value.getBoundingClientRect()
+  const y = clamp(event.clientY - rect.top, 0, rect.height)
+  const h = Math.round((y / rect.height) * 360)
+  applyHsv(h, hsvS.value, hsvV.value)
+}
+
+const onSvPointerDown = (event) => {
+  updateSvFromEvent(event)
+  const move = (evt) => updateSvFromEvent(evt)
+  const up = () => {
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', up)
+  }
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', up)
+}
+
+const onHuePointerDown = (event) => {
+  updateHueFromEvent(event)
+  const move = (evt) => updateHueFromEvent(evt)
+  const up = () => {
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', up)
+  }
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', up)
+}
+
+const svPanelStyle = computed(() => ({
+  background: `hsl(${hsvH.value} 100% 50%)`,
+}))
+
+const svCursorStyle = computed(() => ({
+  left: `${hsvS.value}%`,
+  top: `${100 - hsvV.value}%`,
+}))
+
+const hueCursorStyle = computed(() => ({
+  top: `${(hsvH.value / 360) * 100}%`,
+}))
+
 const onDocumentClick = (event) => {
   const target = event.target
   if (!(target instanceof HTMLElement)) return
@@ -341,6 +620,12 @@ const onDocumentClick = (event) => {
     isCoverFitOpen.value = false
     isLyricsOpen.value = false
     isTimeOpen.value = false
+    isTrackOpen.value = false
+    isFillOpen.value = false
+    isRendererOpen.value = false
+  }
+  if (!target.closest('.color-picker') && !target.closest('.color-row')) {
+    isColorPickerOpen.value = false
   }
 }
 
@@ -372,6 +657,16 @@ onMounted(async () => {
     showCurrentTime.value = stored.showCurrentTime ?? true
     showTotalTime.value = stored.showTotalTime ?? true
     progressShimmer.value = stored.progressShimmer ?? false
+    showProgressThumb.value = stored.showProgressThumb ?? true
+    progressThumbGlow.value = stored.progressThumbGlow ?? false
+    progressTrackStyle.value = stored.progressTrackStyle || 'rounded'
+    progressFillMode.value = stored.progressFillMode || 'solid'
+    progressFillStart.value = stored.progressFillStart || '#22d3ee'
+    progressFillEnd.value = stored.progressFillEnd || '#2563eb'
+    progressRenderer.value = stored.progressRenderer || 'custom'
+    progressFillOpacity.value = stored.progressFillOpacity ?? 100
+    progressShimmerDuration.value = stored.progressShimmerDuration ?? 5
+    progressShimmerDelay.value = stored.progressShimmerDelay ?? 0.5
   } catch (err) {
     console.error('读取配置失败', err)
   }
@@ -622,6 +917,26 @@ watch(
           <div class="group-title">进度条样式</div>
           <div class="options wide">
             <div class="option">
+              <label>渲染方式</label>
+              <div class="select" :class="{ open: isRendererOpen }">
+                <button class="select-trigger" type="button" @click.stop="toggleRenderer">
+                  <span>{{ progressRendererOptions.find((item) => item.value === progressRenderer)?.label }}</span>
+                  <span class="arrow"></span>
+                </button>
+                <ul v-if="isRendererOpen" class="select-menu">
+                  <li
+                    v-for="item in progressRendererOptions"
+                    :key="item.value"
+                    :class="['select-item', { active: item.value === progressRenderer } ]"
+                    @click="selectRenderer(item.value)"
+                  >
+                    {{ item.label }}
+                  </li>
+                </ul>
+              </div>
+              <p class="option-note">原生滑条已废弃，建议使用重写的neo滑条。</p>
+            </div>
+            <div class="option">
               <label>时间显示布局</label>
               <div class="select" :class="{ open: isTimeOpen }">
                 <button class="select-trigger" type="button" @click.stop="toggleTimeLayout">
@@ -640,6 +955,193 @@ watch(
                 </ul>
               </div>
             </div>
+            <div class="option">
+              <label>进度条外观</label>
+              <div class="select" :class="{ open: isTrackOpen }">
+                <button class="select-trigger" type="button" @click.stop="toggleTrackStyle">
+                  <span>{{ progressTrackOptions.find((item) => item.value === progressTrackStyle)?.label }}</span>
+                  <span class="arrow"></span>
+                </button>
+                <ul v-if="isTrackOpen" class="select-menu">
+                  <li
+                    v-for="item in progressTrackOptions"
+                    :key="item.value"
+                    :class="['select-item', { active: item.value === progressTrackStyle } ]"
+                    @click="selectTrackStyle(item.value)"
+                  >
+                    {{ item.label }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div class="option">
+              <label>填充颜色模式</label>
+              <div class="select" :class="{ open: isFillOpen }">
+                <button class="select-trigger" type="button" @click.stop="toggleFillMode">
+                  <span>{{ progressFillOptions.find((item) => item.value === progressFillMode)?.label }}</span>
+                  <span class="arrow"></span>
+                </button>
+                <ul v-if="isFillOpen" class="select-menu">
+                  <li
+                    v-for="item in progressFillOptions"
+                    :key="item.value"
+                    :class="['select-item', { active: item.value === progressFillMode } ]"
+                    @click="selectFillMode(item.value)"
+                  >
+                    {{ item.label }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div class="option">
+              <label>填充起始色</label>
+              <div class="color-row">
+                <button
+                  class="color-preview"
+                  type="button"
+                  :style="{ background: progressFillStart }"
+                  @click.stop="openColorPicker('start')"
+                ></button>
+                <input
+                  class="color-input"
+                  type="text"
+                  v-model.trim="progressFillStart"
+                  @change="applyHex(progressFillStart)"
+                />
+              </div>
+              <transition name="color-pop">
+                <div
+                  v-if="isColorPickerOpen && colorPickerTarget === 'start'"
+                  class="color-picker"
+                  @click.stop
+                >
+                <div class="picker-row">
+                  <div
+                    ref="svPanelRef"
+                    class="sv-panel"
+                    :style="svPanelStyle"
+                    @pointerdown="onSvPointerDown"
+                  >
+                    <span class="sv-cursor" :style="svCursorStyle"></span>
+                  </div>
+                  <div
+                    ref="huePanelRef"
+                    class="hue-panel"
+                    @pointerdown="onHuePointerDown"
+                  >
+                    <span class="hue-cursor" :style="hueCursorStyle"></span>
+                  </div>
+                </div>
+                <div class="picker-inputs">
+                  <div class="picker-field">
+                    <label>HEX</label>
+                    <input class="color-input" type="text" v-model.trim="hexInput" @change="applyHex(hexInput)" />
+                  </div>
+                  <div class="picker-field">
+                    <label>RGB</label>
+                    <div class="picker-grid">
+                      <input type="number" min="0" max="255" v-model.number="rgbR" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                      <input type="number" min="0" max="255" v-model.number="rgbG" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                      <input type="number" min="0" max="255" v-model.number="rgbB" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                    </div>
+                  </div>
+                  <div class="picker-field">
+                    <label>HSV</label>
+                    <div class="picker-grid">
+                      <input type="number" min="0" max="360" v-model.number="hsvInputH" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                      <input type="number" min="0" max="100" v-model.number="hsvInputS" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                      <input type="number" min="0" max="100" v-model.number="hsvInputV" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                    </div>
+                  </div>
+                </div>
+                  <div class="picker-actions">
+                    <button class="ghost small" type="button" @click="closeColorPicker">完成</button>
+                  </div>
+                </div>
+              </transition>
+            </div>
+            <div class="option" v-if="progressFillMode === 'gradient'">
+              <label>填充终止色</label>
+              <div class="color-row">
+                <button
+                  class="color-preview"
+                  type="button"
+                  :style="{ background: progressFillEnd }"
+                  @click.stop="openColorPicker('end')"
+                ></button>
+                <input
+                  class="color-input"
+                  type="text"
+                  v-model.trim="progressFillEnd"
+                  @change="applyHex(progressFillEnd)"
+                />
+              </div>
+              <transition name="color-pop">
+                <div
+                  v-if="isColorPickerOpen && colorPickerTarget === 'end'"
+                  class="color-picker"
+                  @click.stop
+                >
+                <div class="picker-row">
+                  <div
+                    ref="svPanelRef"
+                    class="sv-panel"
+                    :style="svPanelStyle"
+                    @pointerdown="onSvPointerDown"
+                  >
+                    <span class="sv-cursor" :style="svCursorStyle"></span>
+                  </div>
+                  <div
+                    ref="huePanelRef"
+                    class="hue-panel"
+                    @pointerdown="onHuePointerDown"
+                  >
+                    <span class="hue-cursor" :style="hueCursorStyle"></span>
+                  </div>
+                </div>
+                <div class="picker-inputs">
+                  <div class="picker-field">
+                    <label>HEX</label>
+                    <input class="color-input" type="text" v-model.trim="hexInput" @change="applyHex(hexInput)" />
+                  </div>
+                  <div class="picker-field">
+                    <label>RGB</label>
+                    <div class="picker-grid">
+                      <input type="number" min="0" max="255" v-model.number="rgbR" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                      <input type="number" min="0" max="255" v-model.number="rgbG" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                      <input type="number" min="0" max="255" v-model.number="rgbB" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                    </div>
+                  </div>
+                  <div class="picker-field">
+                    <label>HSV</label>
+                    <div class="picker-grid">
+                      <input type="number" min="0" max="360" v-model.number="hsvInputH" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                      <input type="number" min="0" max="100" v-model.number="hsvInputS" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                      <input type="number" min="0" max="100" v-model.number="hsvInputV" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                    </div>
+                  </div>
+                </div>
+                  <div class="picker-actions">
+                    <button class="ghost small" type="button" @click="closeColorPicker">完成</button>
+                  </div>
+                </div>
+              </transition>
+            </div>
+            <div class="option">
+              <label>填充透明度</label>
+              <input type="range" min="0" max="100" step="1" v-model.number="progressFillOpacity" />
+              <span>{{ progressFillOpacity }}%</span>
+            </div>
+            <div class="option">
+              <label>闪光周期（秒）</label>
+              <input type="range" min="1" max="12" step="0.5" v-model.number="progressShimmerDuration" />
+              <span>{{ progressShimmerDuration.toFixed(1) }}s</span>
+            </div>
+            <div class="option">
+              <label>每周期等待（秒）</label>
+              <input type="range" min="0" max="6" step="0.5" v-model.number="progressShimmerDelay" />
+              <span>{{ progressShimmerDelay.toFixed(1) }}s</span>
+            </div>
           </div>
           <div class="toggles">
             <label class="toggle">
@@ -651,6 +1153,16 @@ watch(
               <input type="checkbox" v-model="showTotalTime" />
               <span class="switch"></span>
               <span>显示总时长</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" v-model="showProgressThumb" />
+              <span class="switch"></span>
+              <span>显示进度指示点</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" v-model="progressThumbGlow" />
+              <span class="switch"></span>
+              <span>指示点发光效果</span>
             </label>
             <label class="toggle">
               <input type="checkbox" v-model="progressShimmer" />
@@ -747,13 +1259,13 @@ watch(
 }
 
 .panel {
-  width: min(1400px, 100%);
+  width: min(1500px, 100%);
   position: relative;
   z-index: 2;
   color: #e5e7eb;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
 }
 
 .header-card {
@@ -802,11 +1314,10 @@ h1 {
 }
 
 .group-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(240px, 1fr));
-  gap: 16px;
-  align-items: start;
+  column-count: 4;
+  column-gap: 16px;
   width: 100%;
+  column-fill: balance;
 }
 
 .group {
@@ -818,11 +1329,11 @@ h1 {
   animation: flyIn 820ms ease both;
   display: block;
   width: 100%;
-  margin: 0;
-}
-
-.group.span-2 {
-  grid-column: span 2;
+  box-sizing: border-box;
+  margin-bottom: 16px;
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .group.emphasis {
@@ -831,46 +1342,46 @@ h1 {
   box-shadow: 0 20px 50px rgba(15, 23, 42, 0.5);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1200px) {
   .group-grid {
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  }
-
-  .group.span-2 {
-    grid-column: span 1;
+    column-count: 3;
   }
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 900px) {
   .group-grid {
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    column-count: 2;
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 600px) {
   .group-grid {
-    grid-template-columns: 1fr;
+    column-count: 1;
   }
 }
 
-.group:nth-child(1) {
+.group-grid .group:nth-child(1) {
   animation-delay: 20ms;
 }
 
-.group:nth-child(2) {
+.group-grid .group:nth-child(2) {
   animation-delay: 70ms;
 }
 
-.group:nth-child(3) {
+.group-grid .group:nth-child(3) {
   animation-delay: 120ms;
 }
 
-.group:nth-child(4) {
+.group-grid .group:nth-child(4) {
   animation-delay: 170ms;
 }
 
-.group:nth-child(5) {
+.group-grid .group:nth-child(5) {
   animation-delay: 220ms;
+}
+
+.group-grid .group:nth-child(6) {
+  animation-delay: 270ms;
 }
 
 .group-title {
@@ -998,24 +1509,31 @@ h1 {
   font-size: 13px;
   width: 100%;
   min-width: 0;
+  position: relative;
 }
 
 .option label {
   font-weight: 600;
 }
 
+.option-note {
+  margin: 2px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
 .align-grid {
   display: grid;
-  grid-template-columns: repeat(3, 40px);
-  grid-template-rows: repeat(3, 40px);
+  grid-template-columns: repeat(3, 30px);
+  grid-template-rows: repeat(3, 30px);
   gap: 8px;
   justify-content: start;
 }
 
 .align-item {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.35);
   background: rgba(15, 23, 42, 0.6);
   color: #cbd5e1;
@@ -1157,6 +1675,171 @@ h1 {
   box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.2);
 }
 
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.color-preview {
+  width: 38px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  box-shadow: inset 0 0 0 2px rgba(15, 23, 42, 0.35);
+  cursor: pointer;
+}
+
+.color-input {
+  flex: 1;
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-family: inherit;
+}
+
+.color-input:focus {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.9);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+.color-picker {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.45);
+  display: grid;
+  gap: 12px;
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 20;
+  width: min(360px, 100%);
+}
+
+.picker-row {
+  display: grid;
+  grid-template-columns: 1fr 22px;
+  gap: 10px;
+}
+
+.sv-panel {
+  position: relative;
+  height: 140px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  cursor: crosshair;
+}
+
+.sv-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #fff, rgba(255, 255, 255, 0));
+}
+
+.sv-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, #000, rgba(0, 0, 0, 0));
+}
+
+.sv-cursor {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.5);
+  transform: translate(-6px, -6px);
+  z-index: 2;
+}
+
+.hue-panel {
+  position: relative;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    #ff0000 0%,
+    #ff7f00 16.6%,
+    #ffff00 33.3%,
+    #00ff00 50%,
+    #00ffff 66.6%,
+    #0000ff 83.3%,
+    #ff00ff 100%
+  );
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  cursor: pointer;
+}
+
+.hue-cursor {
+  position: absolute;
+  left: 50%;
+  width: 18px;
+  height: 6px;
+  border-radius: 999px;
+  background: #fff;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.6);
+}
+
+.picker-inputs {
+  display: grid;
+  gap: 10px;
+}
+
+.picker-field {
+  display: grid;
+  gap: 6px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.picker-grid input {
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.picker-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ghost.small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.color-pop-enter-active,
+.color-pop-leave-active {
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.color-pop-enter-from,
+.color-pop-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+}
+
 .actions {
   display: flex;
   gap: 12px;
@@ -1270,14 +1953,13 @@ h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: border-color 160ms ease, box-shadow 160ms ease, transform 120ms ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
   box-sizing: border-box;
   max-width: 100%;
 }
 
 .select-trigger:hover {
-  transform: translateY(-1px);
-}
+  border-color: rgba(56, 189, 248, 0.7);}
 
 .select.open .select-trigger {
   border-color: rgba(56, 189, 248, 0.9);

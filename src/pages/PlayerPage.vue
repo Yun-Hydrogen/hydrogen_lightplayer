@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getConfig, subscribeConfig } from '../utils/storage'
 
@@ -26,6 +26,18 @@ const timeLayout = ref('default')
 const showCurrentTime = ref(true)
 const showTotalTime = ref(true)
 const progressShimmer = ref(false)
+const showProgressThumb = ref(true)
+const progressThumbGlow = ref(false)
+const progressTrackStyle = ref('rounded')
+const progressFillMode = ref('solid')
+const progressFillStart = ref('#22d3ee')
+const progressFillEnd = ref('#2563eb')
+const progressRenderer = ref('custom')
+const progressFillOpacity = ref(100)
+const progressShimmerDuration = ref(5)
+const progressShimmerDelay = ref(0.5)
+const progressBarWidth = ref(0)
+const shimmerSize = 42
 const audioEl = ref(null)
 const isPlaying = ref(false)
 const duration = ref(0)
@@ -58,6 +70,124 @@ const progress = computed(() => {
   if (!duration.value) return 0
   return Math.min(100, Math.max(0, (currentTime.value / duration.value) * 100))
 })
+
+const progressFillColors = computed(() => {
+  if (progressFillMode.value === 'gradient') {
+    return {
+      start: progressFillStart.value || '#22d3ee',
+      end: progressFillEnd.value || '#2563eb',
+    }
+  }
+  const solid = progressFillStart.value || '#22d3ee'
+  return { start: solid, end: solid }
+})
+
+const hexToRgba = (hex, alpha) => {
+  if (!hex) return `rgba(34, 211, 238, ${alpha})`
+  const raw = hex.replace('#', '').trim()
+  const normalized = raw.length === 3
+    ? raw.split('').map((c) => c + c).join('')
+    : raw.padEnd(6, '0')
+  const r = parseInt(normalized.slice(0, 2), 16)
+  const g = parseInt(normalized.slice(2, 4), 16)
+  const b = parseInt(normalized.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+const progressStyle = computed(() => ({
+  '--progress': `${progress.value}%`,
+  '--fill-start': hexToRgba(progressFillColors.value.start, Math.min(1, Math.max(0, progressFillOpacity.value / 100))),
+  '--fill-end': hexToRgba(progressFillColors.value.end, Math.min(1, Math.max(0, progressFillOpacity.value / 100))),
+  '--thumb-color': progressFillColors.value.end,
+  '--shimmer-duration': `${Math.max(0.5, Number(progressShimmerDuration.value) || 5)}s`,
+  '--shimmer-size': `${shimmerSize}px`,
+  '--shimmer-end': `${Math.max(0, progressBarWidth.value * (progress.value / 100) - shimmerSize)}px`,
+}))
+
+const shimmerVisible = computed(() =>
+  progressBarWidth.value > 0 &&
+  progressBarWidth.value * (progress.value / 100) > shimmerSize
+)
+
+const progressClasses = computed(() => ({
+  shimmer: progressShimmer.value && hasConfig.value && shimmerActive.value && shimmerVisible.value,
+  'no-thumb': !showProgressThumb.value,
+  'thumb-glow': progressThumbGlow.value && showProgressThumb.value && hasConfig.value,
+  square: progressTrackStyle.value === 'square',
+}))
+
+const progressBarRef = ref(null)
+let isSeeking = false
+const shimmerActive = ref(false)
+let shimmerTimer = null
+let shimmerOffTimer = null
+let progressResizeObserver = null
+
+const updateProgressWidth = () => {
+  if (!progressBarRef.value) return
+  progressBarWidth.value = progressBarRef.value.getBoundingClientRect().width
+}
+
+const stopShimmerCycle = () => {
+  shimmerActive.value = false
+  if (shimmerTimer) {
+    clearInterval(shimmerTimer)
+    shimmerTimer = null
+  }
+  if (shimmerOffTimer) {
+    clearTimeout(shimmerOffTimer)
+    shimmerOffTimer = null
+  }
+}
+
+const startShimmerCycle = () => {
+  stopShimmerCycle()
+  if (!progressShimmer.value || !hasConfig.value) return
+  const durationMs = Math.max(500, Number(progressShimmerDuration.value || 5) * 1000)
+  const delayMs = Math.max(0, Number(progressShimmerDelay.value || 0) * 1000)
+  const totalMs = durationMs + delayMs
+  shimmerActive.value = true
+  shimmerOffTimer = setTimeout(() => {
+    shimmerActive.value = false
+  }, durationMs)
+  shimmerTimer = setInterval(() => {
+    shimmerActive.value = true
+    if (shimmerOffTimer) {
+      clearTimeout(shimmerOffTimer)
+    }
+    shimmerOffTimer = setTimeout(() => {
+      shimmerActive.value = false
+    }, durationMs)
+  }, totalMs)
+}
+
+const applySeekByEvent = (event) => {
+  if (!progressBarRef.value || !duration.value) return
+  const rect = progressBarRef.value.getBoundingClientRect()
+  const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width))
+  const newTime = ratio * duration.value
+  audioEl.value.currentTime = newTime
+  currentTime.value = newTime
+}
+
+const onSeekPointerDown = (event) => {
+  if (!hasConfig.value || !duration.value || !audioEl.value) return
+  isSeeking = true
+  applySeekByEvent(event)
+  window.addEventListener('pointermove', onSeekPointerMove)
+  window.addEventListener('pointerup', onSeekPointerUp)
+}
+
+const onSeekPointerMove = (event) => {
+  if (!isSeeking) return
+  applySeekByEvent(event)
+}
+
+const onSeekPointerUp = () => {
+  isSeeking = false
+  window.removeEventListener('pointermove', onSeekPointerMove)
+  window.removeEventListener('pointerup', onSeekPointerUp)
+}
 
 const formatTime = (value) => {
   if (!Number.isFinite(value)) return '00:00'
@@ -120,6 +250,16 @@ const loadConfig = async () => {
       showCurrentTime.value = true
       showTotalTime.value = true
       progressShimmer.value = false
+      showProgressThumb.value = true
+      progressThumbGlow.value = false
+      progressTrackStyle.value = 'rounded'
+      progressFillMode.value = 'solid'
+      progressFillStart.value = '#22d3ee'
+      progressFillEnd.value = '#2563eb'
+      progressRenderer.value = 'custom'
+      progressFillOpacity.value = 100
+      progressShimmerDuration.value = 5
+      progressShimmerDelay.value = 0.5
       return
     }
 
@@ -137,6 +277,16 @@ const loadConfig = async () => {
     showCurrentTime.value = stored.showCurrentTime ?? true
     showTotalTime.value = stored.showTotalTime ?? true
     progressShimmer.value = stored.progressShimmer ?? false
+    showProgressThumb.value = stored.showProgressThumb ?? true
+    progressThumbGlow.value = stored.progressThumbGlow ?? false
+    progressTrackStyle.value = stored.progressTrackStyle || 'rounded'
+    progressFillMode.value = stored.progressFillMode || 'solid'
+    progressFillStart.value = stored.progressFillStart || '#22d3ee'
+    progressFillEnd.value = stored.progressFillEnd || '#2563eb'
+    progressRenderer.value = stored.progressRenderer || 'custom'
+    progressFillOpacity.value = stored.progressFillOpacity ?? 100
+    progressShimmerDuration.value = stored.progressShimmerDuration ?? 5
+    progressShimmerDelay.value = stored.progressShimmerDelay ?? 0.5
     bgName.value = stored.bgName || ''
     bgFit.value = stored.bgFit || 'cover'
     bgAlign.value = stored.bgAlign || 'center center'
@@ -264,12 +414,34 @@ let unsubscribe = null
 onMounted(async () => {
   await loadConfig()
   unsubscribe = subscribeConfig(loadConfig)
+  updateProgressWidth()
+  if (progressBarRef.value && typeof ResizeObserver !== 'undefined') {
+    progressResizeObserver = new ResizeObserver(() => updateProgressWidth())
+    progressResizeObserver.observe(progressBarRef.value)
+  } else {
+    window.addEventListener('resize', updateProgressWidth)
+  }
 })
+
+watch(
+  [progressShimmer, progressShimmerDuration, progressShimmerDelay, hasConfig],
+  () => {
+    startShimmerCycle()
+  }
+)
 
 onBeforeUnmount(() => {
   if (unsubscribe) {
     unsubscribe()
     unsubscribe = null
+  }
+  stopShimmerCycle()
+  if (progressResizeObserver && progressBarRef.value) {
+    progressResizeObserver.unobserve(progressBarRef.value)
+    progressResizeObserver.disconnect()
+    progressResizeObserver = null
+  } else {
+    window.removeEventListener('resize', updateProgressWidth)
   }
   revokeObjectUrl(audioUrl.value)
   revokeObjectUrl(coverUrl.value)
@@ -338,8 +510,13 @@ onBeforeUnmount(() => {
               <div class="info-divider" aria-hidden="true"></div>
               <div class="info-bottom">
                 <div class="progress-row">
-                  <span v-if="leftTimeVisible" class="time">{{ leftTimeText }}</span>
-                  <div class="progress" :class="{ shimmer: progressShimmer && hasConfig }">
+                  <span v-if="leftTimeVisible" class="time left">{{ leftTimeText }}</span>
+                  <div
+                    v-if="progressRenderer === 'native'"
+                    class="progress native"
+                    :class="progressClasses"
+                    :style="progressStyle"
+                  >
                     <input
                       type="range"
                       min="0"
@@ -347,11 +524,28 @@ onBeforeUnmount(() => {
                       step="0.1"
                       :value="progress"
                       :disabled="!hasConfig || !duration"
-                      :style="{ '--progress': `${progress}%` }"
                       @input="onSeek"
                     />
                   </div>
-                  <span v-if="rightTimeVisible" class="time">{{ rightTimeText }}</span>
+                  <div
+                    v-else
+                    ref="progressBarRef"
+                    class="progress custom"
+                    :class="progressClasses"
+                    :style="progressStyle"
+                    role="slider"
+                    aria-label="播放进度"
+                    :aria-valuenow="Math.round(progress)"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    @pointerdown="onSeekPointerDown"
+                  >
+                    <div class="progress-track">
+                      <div class="progress-fill"></div>
+                      <div v-if="showProgressThumb" class="progress-thumb"></div>
+                    </div>
+                  </div>
+                  <span v-if="rightTimeVisible" class="time right">{{ rightTimeText }}</span>
                 </div>
 
                 <div class="transport">
@@ -614,7 +808,7 @@ h2 {
 
 .info-panel {
   padding: 20px;
-  padding-bottom: 5px;
+  padding-bottom: 10px;
   height: auto;
   min-height: 180px;
   display: flex;
@@ -696,9 +890,9 @@ h2 {
 
 .progress-row {
   display: grid;
-  grid-template-columns: minmax(48px, auto) 1fr minmax(48px, auto);
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
 }
 
 .info-bottom {
@@ -710,7 +904,116 @@ h2 {
 .time {
   font-size: 12px;
   color: #cbd5e1;
-  min-width: 48px;
+  font-variant-numeric: tabular-nums;
+  line-height: 12px;
+  white-space: nowrap;
+}
+
+.time.left {
+  text-align: left;
+}
+
+.time.right {
+  text-align: right;
+}
+
+.progress {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+}
+
+.progress.square {
+  border-radius: 0;
+}
+
+.progress.square .progress-track,
+.progress.square .progress-fill {
+  border-radius: 0;
+}
+
+.progress.custom {
+  cursor: pointer;
+}
+
+.progress.custom .progress-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: inherit;
+  background: rgba(148, 163, 184, 0.25);
+  overflow: hidden;
+}
+
+.progress.custom .progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--progress, 0%);
+  background: linear-gradient(
+    90deg,
+    var(--fill-start, #22d3ee) 0%,
+    var(--fill-end, #22d3ee) 100%
+  );
+  border-radius: inherit;
+  z-index: 1;
+}
+
+.progress.custom .progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: var(--shimmer-size, 42px);
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.75) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  z-index: 2;
+}
+
+.progress.custom.shimmer .progress-fill::after {
+  opacity: 1;
+  animation: shimmer var(--shimmer-duration, 5s) linear infinite;
+}
+
+.progress.custom .progress-thumb {
+  position: absolute;
+  top: 50%;
+  left: var(--progress, 0%);
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--thumb-color, #22d3ee);
+  border: 2px solid rgba(15, 23, 42, 0.8);
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.2);
+  z-index: 3;
+}
+
+.progress.custom.no-thumb .progress-thumb {
+  display: none;
+}
+
+.progress.custom.thumb-glow .progress-thumb {
+  animation: thumbPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes thumbPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 4px rgba(15, 23, 42, 0.4), 0 0 10px var(--thumb-color, #22d3ee);
+  }
+  50% {
+    box-shadow: 0 0 2px rgba(15, 23, 42, 0.2), 0 0 14px var(--thumb-color, #22d3ee);
+  }
 }
 
 .progress input[type='range'] {
@@ -718,11 +1021,11 @@ h2 {
   -webkit-appearance: none;
   appearance: none;
   height: 6px;
-  border-radius: 999px;
+  border-radius: inherit;
   background: linear-gradient(
       90deg,
-      #22d3ee 0%,
-      #22d3ee var(--progress, 0%),
+      var(--fill-start, #22d3ee) 0%,
+      var(--fill-end, #22d3ee) var(--progress, 0%),
       rgba(148, 163, 184, 0.25) var(--progress, 0%),
       rgba(148, 163, 184, 0.25) 100%
     );
@@ -736,7 +1039,7 @@ h2 {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #22d3ee;
+  background: var(--fill-end, #22d3ee);
   box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.2);
   border: 2px solid rgba(15, 23, 42, 0.8);
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
@@ -750,24 +1053,44 @@ h2 {
 .progress input[type='range']::-moz-range-track {
   height: 6px;
   background: rgba(148, 163, 184, 0.25);
-  border-radius: 999px;
+  border-radius: inherit;
 }
 
 .progress input[type='range']::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #22d3ee;
+  background: var(--fill-end, #22d3ee);
   border: 2px solid rgba(15, 23, 42, 0.8);
   box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.2);
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 
-.progress {
-  position: relative;
+.progress.no-thumb input[type='range']::-webkit-slider-thumb {
+  width: 0;
+  height: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
 }
 
-.progress.shimmer::before {
+.progress.no-thumb input[type='range']::-moz-range-thumb {
+  width: 0;
+  height: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.progress.thumb-glow input[type='range']::-webkit-slider-thumb {
+  box-shadow: 0 0 6px var(--fill-end, #22d3ee), 0 0 16px var(--fill-end, #22d3ee);
+}
+
+.progress.thumb-glow input[type='range']::-moz-range-thumb {
+  box-shadow: 0 0 6px var(--fill-end, #22d3ee), 0 0 16px var(--fill-end, #22d3ee);
+}
+
+.progress.native.shimmer::before {
   content: '';
   position: absolute;
   left: 0;
@@ -775,20 +1098,29 @@ h2 {
   height: 6px;
   width: var(--progress, 0%);
   transform: translateY(-50%);
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(34, 211, 238, 0.2), rgba(255, 255, 255, 0.6), rgba(34, 211, 238, 0.2));
-  background-size: 120px 100%;
-  animation: shimmer 1.6s linear infinite;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.6) 45%,
+    rgba(255, 255, 255, 0) 90%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 5s linear infinite;
   pointer-events: none;
-  mix-blend-mode: screen;
 }
 
 @keyframes shimmer {
   0% {
-    background-position: -120px 0;
+    transform: translateX(calc(var(--shimmer-size, 30px) * -1));
+    opacity: 0;
+  }
+  80% {
+    opacity: 1;
   }
   100% {
-    background-position: 120px 0;
+    transform: translateX(var(--shimmer-end, 0px));
+    opacity: 0;
   }
 }
 
