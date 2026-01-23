@@ -36,6 +36,11 @@ const progressRenderer = ref('custom')
 const progressFillOpacity = ref(100)
 const progressShimmerDuration = ref(5)
 const progressShimmerDelay = ref(0.5)
+const showCover = ref(true)
+const showSongInfo = ref(true)
+const infoPanelPosition = ref('separate')
+const infoCoverSide = ref('left')
+const showPlaybackControls = ref(true)
 const progressBarWidth = ref(0)
 const shimmerSize = 42
 const audioEl = ref(null)
@@ -260,6 +265,11 @@ const loadConfig = async () => {
       progressFillOpacity.value = 100
       progressShimmerDuration.value = 5
       progressShimmerDelay.value = 0.5
+      showCover.value = true
+      showSongInfo.value = true
+      infoPanelPosition.value = 'separate'
+      infoCoverSide.value = 'left'
+      showPlaybackControls.value = true
       return
     }
 
@@ -287,6 +297,11 @@ const loadConfig = async () => {
     progressFillOpacity.value = stored.progressFillOpacity ?? 100
     progressShimmerDuration.value = stored.progressShimmerDuration ?? 5
     progressShimmerDelay.value = stored.progressShimmerDelay ?? 0.5
+    showCover.value = stored.showCover ?? true
+    showSongInfo.value = stored.showSongInfo ?? true
+    infoPanelPosition.value = stored.infoPanelPosition || 'separate'
+    infoCoverSide.value = stored.infoCoverSide || 'left'
+    showPlaybackControls.value = stored.showPlaybackControls ?? true
     bgName.value = stored.bgName || ''
     bgFit.value = stored.bgFit || 'cover'
     bgAlign.value = stored.bgAlign || 'center center'
@@ -388,6 +403,9 @@ const bgDimStyle = computed(() => ({
 }))
 
 const lyricsOnRight = computed(() => lyricsPosition.value === 'right')
+const infoInLyrics = computed(() => infoPanelPosition.value !== 'separate')
+const infoAtTop = computed(() => infoPanelPosition.value === 'lyrics-top')
+const infoCoverRight = computed(() => infoCoverSide.value === 'right')
 
 const leftTimeVisible = computed(() => {
   if (timeLayout.value === 'swap') return showTotalTime.value
@@ -448,47 +466,16 @@ onBeforeUnmount(() => {
   revokeObjectUrl(bgUrl.value)
 })
 </script>
-
 <template>
   <main class="page">
     <div class="bg-image" :style="bgImageStyle" aria-hidden="true"></div>
     <div class="bg-dim" :style="bgDimStyle" aria-hidden="true"></div>
 
-    <div class="layout" :class="{ 'lyrics-right': lyricsOnRight }">
-      <section class="lyrics-panel card">
-        <div class="panel-header">
-          <div>
-          </div>
-        </div>
-
-        <div v-if="hasConfig" class="lyrics-body">
-          <div class="now-line" :class="{ empty: !lyrics.length }">
-            <span>{{ currentLine }}</span>
-          </div>
-
-          <div class="lyrics" v-if="lyrics.length">
-            <div
-              v-for="(line, index) in lyrics"
-              :key="`${line.timeSec}-${index}`"
-              :class="['lyric-line', { active: index === activeIndex } ]"
-            >
-              <span class="stamp">{{ formatTime(line.timeSec) }}</span>
-              <span class="text">{{ line.text }}</span>
-            </div>
-          </div>
-          <p v-else class="placeholder">未加载歌词，请前往配置页上传歌词。</p>
-        </div>
-
-        <div v-else class="empty">
-          <p>当前未配置音频与歌词。</p>
-          <button class="pill" type="button" @click="goSettings">前往配置</button>
-        </div>
-      </section>
-
-      <section class="right-column">
-        <div class="info-panel card" :class="{ disabled: !hasConfig }">
-          <div class="info-top">
-            <div class="cover" aria-hidden="true">
+    <div class="layout" :class="{ 'lyrics-right': lyricsOnRight, 'info-inline': infoInLyrics }">
+      <section class="lyrics-column">
+        <div v-if="infoInLyrics && infoAtTop" class="info-panel card inline" :class="{ disabled: !hasConfig }">
+          <div class="info-top" :class="{ 'no-cover': !showCover, 'cover-right': infoCoverRight, compact: !showSongInfo }">
+            <div v-if="showCover" class="cover" aria-hidden="true">
               <img v-if="coverUrl" :src="coverUrl" alt="音乐封面" :style="coverStyle" />
               <div v-else class="cover-fallback">
                 <svg viewBox="0 0 120 120" aria-hidden="true">
@@ -501,13 +488,15 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <div class="info-text">
-              <div class="title-row">
-                <h2>{{ songTitle }}</h2>
-                <span class="tag" v-if="!hasConfig">未配置</span>
-              </div>
-              <p class="desc">{{ songDesc }}</p>
-              <div class="info-divider" aria-hidden="true"></div>
+            <div class="info-text" :class="{ compact: !showSongInfo }">
+              <template v-if="showSongInfo">
+                <div class="title-row">
+                  <h2>{{ songTitle }}</h2>
+                  <span class="tag" v-if="!hasConfig">未配置</span>
+                </div>
+                <p class="desc">{{ songDesc }}</p>
+                <div class="info-divider" aria-hidden="true"></div>
+              </template>
               <div class="info-bottom">
                 <div class="progress-row">
                   <span v-if="leftTimeVisible" class="time left">{{ leftTimeText }}</span>
@@ -536,8 +525,8 @@ onBeforeUnmount(() => {
                     role="slider"
                     aria-label="播放进度"
                     :aria-valuenow="Math.round(progress)"
-                    aria-valuemin="0"
-                    aria-valuemax="100"
+                    :aria-valuemin="0"
+                    :aria-valuemax="100"
                     @pointerdown="onSeekPointerDown"
                   >
                     <div class="progress-track">
@@ -548,7 +537,171 @@ onBeforeUnmount(() => {
                   <span v-if="rightTimeVisible" class="time right">{{ rightTimeText }}</span>
                 </div>
 
-                <div class="transport">
+                <div v-if="showPlaybackControls" class="transport">
+                  <button
+                    class="icon-btn"
+                    type="button"
+                    :disabled="!hasConfig || !duration"
+                    aria-label="快退 5 秒"
+                    @click="seekBySeconds(-5)"
+                  >
+                    <svg viewBox="0 0 1024 1024" aria-hidden="true">
+                      <path
+                        d="M512 0C229.2 0 0 229.2 0 512s229.2 512 512 512 512-229.2 512-512S794.8 0 512 0z m316.8 828.8c-41.2 41.2-89.1 73.5-142.4 96C631.2 948.2 572.5 960 512 960s-119.2-11.8-174.4-35.2c-53.3-22.6-101.3-54.9-142.4-96-41.2-41.2-73.5-89.1-96-142.4C75.8 631.2 64 572.5 64 512s11.8-119.2 35.2-174.4c22.6-53.3 54.9-101.3 96-142.4 41.2-41.2 89.1-73.5 142.4-96C392.8 75.8 451.5 64 512 64s119.2 11.8 174.4 35.2c53.3 22.6 101.3 54.9 142.4 96 41.2 41.2 73.5 89.1 96 142.4C948.2 392.8 960 451.5 960 512s-11.8 119.2-35.2 174.4c-22.5 53.3-54.8 101.2-96 142.4z"
+                        fill="currentColor"
+                      />
+                      <path
+                        d="M768 305.3v413.3c0 6.8-8 10.5-13.2 6.1L550.9 551v167.7c0 6.8-8 10.5-13.2 6.1L304 525.6V704h-64V320h64v178.4l233.7-199.1c5.2-4.4 13.2-0.7 13.2 6.1V473l203.9-173.7c5.2-4.5 13.2-0.8 13.2 6z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    class="icon-btn primary"
+                    type="button"
+                    :disabled="!hasConfig || !duration"
+                    aria-label="播放或暂停"
+                    @click="togglePlay"
+                  >
+                    <svg v-if="isPlaying" viewBox="0 0 1024 1024" aria-hidden="true">
+                      <path
+                        d="M512 64c60.5 0 119.2 11.8 174.4 35.2 53.3 22.6 101.3 54.9 142.4 96 41.2 41.2 73.5 89.1 96 142.4C948.2 392.8 960 451.5 960 512s-11.8 119.2-35.2 174.4c-22.6 53.3-54.9 101.3-96 142.4-41.2 41.2-89.1 73.5-142.4 96C631.2 948.2 572.5 960 512 960s-119.2-11.8-174.4-35.2c-53.3-22.6-101.3-54.9-142.4-96-41.2-41.2-73.5-89.1-96-142.4C75.8 631.2 64 572.5 64 512s11.8-119.2 35.2-174.4c22.6-53.3 54.9-101.3 96-142.4 41.2-41.2 89.1-73.5 142.4-96C392.8 75.8 451.5 64 512 64m0-64C229.2 0 0 229.2 0 512s229.2 512 512 512 512-229.2 512-512S794.8 0 512 0z"
+                        fill="currentColor"
+                      />
+                      <path
+                        d="M427 752h-56c-2.2 0-4-1.8-4-4V276c0-2.2 1.8-4 4-4h56c2.2 0 4 1.8 4 4v472c0 2.2-1.8 4-4 4zM652 752h-56c-2.2 0-4-1.8-4-4V276c0-2.2 1.8-4 4-4h56c2.2 0 4 1.8 4 4v472c0 2.2-1.8 4-4 4z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                    <svg v-else viewBox="0 0 1024 1024" aria-hidden="true">
+                      <path
+                        d="M512 64c60.5 0 119.2 11.8 174.4 35.2 53.3 22.6 101.3 54.9 142.4 96 41.2 41.2 73.5 89.1 96 142.4C948.2 392.8 960 451.5 960 512s-11.8 119.2-35.2 174.4c-22.6 53.3-54.9 101.3-96 142.4-41.2 41.2-89.1 73.5-142.4 96C631.2 948.2 572.5 960 512 960s-119.2-11.8-174.4-35.2c-53.3-22.6-101.3-54.9-142.4-96-41.2-41.2-73.5-89.1-96-142.4C75.8 631.2 64 572.5 64 512s11.8-119.2 35.2-174.4c22.6-53.3 54.9-101.3 96-142.4 41.2-41.2 89.1-73.5 142.4-96C392.8 75.8 451.5 64 512 64m0-64C229.2 0 0 229.2 0 512s229.2 512 512 512 512-229.2 512-512S794.8 0 512 0z"
+                        fill="currentColor"
+                      />
+                      <path
+                        d="M809.7 508.5L357.9 259.3c-2.7-1.5-5.9 0.5-5.9 3.5v498.4c0 3 3.3 5 5.9 3.5l451.7-249.2c2.8-1.5 2.8-5.5 0.1-7z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    class="icon-btn"
+                    type="button"
+                    :disabled="!hasConfig || !duration"
+                    aria-label="快进 5 秒"
+                    @click="seekBySeconds(5)"
+                  >
+                    <svg viewBox="0 0 1024 1024" aria-hidden="true">
+                      <path
+                        d="M0 512c0 282.8 229.2 512 512 512s512-229.2 512-512S794.8 0 512 0 0 229.2 0 512z m99.2 174.4C75.8 631.2 64 572.5 64 512s11.8-119.2 35.2-174.4c22.6-53.3 54.9-101.3 96-142.4 41.2-41.2 89.1-73.5 142.4-96C392.8 75.8 451.5 64 512 64s119.2 11.8 174.4 35.2c53.3 22.6 101.3 54.9 142.4 96 41.2 41.2 73.5 89.1 96 142.4C948.2 392.8 960 451.5 960 512s-11.8 119.2-35.2 174.4c-22.6 53.3-54.9 101.3-96 142.4-41.2 41.2-89.1 73.5-142.4 96C631.2 948.2 572.5 960 512 960s-119.2-11.8-174.4-35.2c-53.3-22.6-101.3-54.9-142.4-96-41.2-41.2-73.5-89.1-96-142.4z"
+                        fill="currentColor"
+                      />
+                      <path
+                        d="M256 305.3v413.3c0 6.8 8 10.5 13.2 6.1L473.1 551v167.7c0 6.8 8 10.5 13.2 6.1L720 525.6V704h64V320h-64v178.4L486.3 299.2c-5.2-4.4-13.2-0.7-13.2 6.1V473L269.2 299.2c-5.2-4.4-13.2-0.7-13.2 6.1z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section class="lyrics-panel card">
+          <div class="panel-header">
+            <div>
+            </div>
+          </div>
+          <div v-if="hasConfig" class="lyrics-body">
+            <div class="now-line" :class="{ empty: !lyrics.length }">
+              <span>{{ currentLine }}</span>
+            </div>
+
+            <div class="lyrics" v-if="lyrics.length">
+              <div
+                v-for="(line, index) in lyrics"
+                :key="`${line.timeSec}-${index}`"
+                :class="['lyric-line', { active: index === activeIndex } ]"
+              >
+                <span class="stamp">{{ formatTime(line.timeSec) }}</span>
+                <span class="text">{{ line.text }}</span>
+              </div>
+            </div>
+            <p v-else class="placeholder">未加载歌词，请前往配置页上传歌词。</p>
+          </div>
+
+          <div v-else class="empty">
+            <p>当前未配置音频与歌词。</p>
+            <button class="pill" type="button" @click="goSettings">前往配置</button>
+          </div>
+        </section>
+
+        <div v-if="infoInLyrics && !infoAtTop" class="info-panel card inline" :class="{ disabled: !hasConfig }">
+          <div class="info-top" :class="{ 'no-cover': !showCover, 'cover-right': infoCoverRight, compact: !showSongInfo }">
+            <div v-if="showCover" class="cover" aria-hidden="true">
+              <img v-if="coverUrl" :src="coverUrl" alt="音乐封面" :style="coverStyle" />
+              <div v-else class="cover-fallback">
+                <svg viewBox="0 0 120 120" aria-hidden="true">
+                  <circle cx="60" cy="60" r="58" fill="rgba(56,189,248,0.15)" />
+                  <path
+                    d="M78 26v42.5a16 16 0 1 1-8-13.8V40l-28 6.6v30.4a16 16 0 1 1-8-13.8V36.4L78 26z"
+                    fill="#7dd3fc"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            <div class="info-text" :class="{ compact: !showSongInfo }">
+              <template v-if="showSongInfo">
+                <div class="title-row">
+                  <h2>{{ songTitle }}</h2>
+                  <span class="tag" v-if="!hasConfig">未配置</span>
+                </div>
+                <p class="desc">{{ songDesc }}</p>
+                <div class="info-divider" aria-hidden="true"></div>
+              </template>
+              <div class="info-bottom">
+                <div class="progress-row">
+                  <span v-if="leftTimeVisible" class="time left">{{ leftTimeText }}</span>
+                  <div
+                    v-if="progressRenderer === 'native'"
+                    class="progress native"
+                    :class="progressClasses"
+                    :style="progressStyle"
+                  >
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      :value="progress"
+                      :disabled="!hasConfig || !duration"
+                      @input="onSeek"
+                    />
+                  </div>
+                  <div
+                    v-else
+                    ref="progressBarRef"
+                    class="progress custom"
+                    :class="progressClasses"
+                    :style="progressStyle"
+                    role="slider"
+                    aria-label="播放进度"
+                    :aria-valuenow="Math.round(progress)"
+                    :aria-valuemin="0"
+                    :aria-valuemax="100"
+                    @pointerdown="onSeekPointerDown"
+                  >
+                    <div class="progress-track">
+                      <div class="progress-fill"></div>
+                      <div v-if="showProgressThumb" class="progress-thumb"></div>
+                    </div>
+                  </div>
+                  <span v-if="rightTimeVisible" class="time right">{{ rightTimeText }}</span>
+                </div>
+
+                <div v-if="showPlaybackControls" class="transport">
                   <button
                     class="icon-btn"
                     type="button"
@@ -619,6 +772,144 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </section>
+
+      <section v-if="!infoInLyrics" class="right-column">
+        <div class="info-panel card" :class="{ disabled: !hasConfig }">
+          <div class="info-top" :class="{ 'no-cover': !showCover, 'cover-right': infoCoverRight, compact: !showSongInfo }">
+            <div v-if="showCover" class="cover" aria-hidden="true">
+              <img v-if="coverUrl" :src="coverUrl" alt="音乐封面" :style="coverStyle" />
+              <div v-else class="cover-fallback">
+                <svg viewBox="0 0 120 120" aria-hidden="true">
+                  <circle cx="60" cy="60" r="58" fill="rgba(56,189,248,0.15)" />
+                  <path
+                    d="M78 26v42.5a16 16 0 1 1-8-13.8V40l-28 6.6v30.4a16 16 0 1 1-8-13.8V36.4L78 26z"
+                    fill="#7dd3fc"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            <div class="info-text" :class="{ compact: !showSongInfo }">
+              <template v-if="showSongInfo">
+                <div class="title-row">
+                  <h2>{{ songTitle }}</h2>
+                  <span class="tag" v-if="!hasConfig">未配置</span>
+                </div>
+                <p class="desc">{{ songDesc }}</p>
+                <div class="info-divider" aria-hidden="true"></div>
+              </template>
+              <div class="info-bottom">
+                <div class="progress-row">
+                  <span v-if="leftTimeVisible" class="time left">{{ leftTimeText }}</span>
+                  <div
+                    v-if="progressRenderer === 'native'"
+                    class="progress native"
+                    :class="progressClasses"
+                    :style="progressStyle"
+                  >
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      :value="progress"
+                      :disabled="!hasConfig || !duration"
+                      @input="onSeek"
+                    />
+                  </div>
+                  <div
+                    v-else
+                    ref="progressBarRef"
+                    class="progress custom"
+                    :class="progressClasses"
+                    :style="progressStyle"
+                    role="slider"
+                    aria-label="播放进度"
+                    :aria-valuenow="Math.round(progress)"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    @pointerdown="onSeekPointerDown"
+                  >
+                    <div class="progress-track">
+                      <div class="progress-fill"></div>
+                      <div v-if="showProgressThumb" class="progress-thumb"></div>
+                    </div>
+                  </div>
+                  <span v-if="rightTimeVisible" class="time right">{{ rightTimeText }}</span>
+                </div>
+
+                <div v-if="showPlaybackControls" class="transport">
+                  <button
+                    class="icon-btn"
+                    type="button"
+                    :disabled="!hasConfig || !duration"
+                    aria-label="快退 5 秒"
+                    @click="seekBySeconds(-5)"
+                  >
+                    <svg viewBox="0 0 1024 1024" aria-hidden="true">
+                      <path
+                        d="M512 0C229.2 0 0 229.2 0 512s229.2 512 512 512 512-229.2 512-512S794.8 0 512 0z m316.8 828.8c-41.2 41.2-89.1 73.5-142.4 96C631.2 948.2 572.5 960 512 960s-119.2-11.8-174.4-35.2c-53.3-22.6-101.3-54.9-142.4-96-41.2-41.2-73.5-89.1-96-142.4C75.8 631.2 64 572.5 64 512s11.8-119.2 35.2-174.4c22.6-53.3 54.9-101.3 96-142.4 41.2-41.2 89.1-73.5 142.4-96C392.8 75.8 451.5 64 512 64s119.2 11.8 174.4 35.2c53.3 22.6 101.3 54.9 142.4 96 41.2 41.2 73.5 89.1 96 142.4C948.2 392.8 960 451.5 960 512s-11.8 119.2-35.2 174.4c-22.5 53.3-54.8 101.2-96 142.4z"
+                        fill="currentColor"
+                      />
+                      <path
+                        d="M768 305.3v413.3c0 6.8-8 10.5-13.2 6.1L550.9 551v167.7c0 6.8-8 10.5-13.2 6.1L304 525.6V704h-64V320h64v178.4l233.7-199.1c5.2-4.4 13.2-0.7 13.2 6.1V473l203.9-173.7c5.2-4.5 13.2-0.8 13.2 6z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    class="icon-btn primary"
+                    type="button"
+                    :disabled="!hasConfig || !duration"
+                    aria-label="播放或暂停"
+                    @click="togglePlay"
+                  >
+                    <svg v-if="isPlaying" viewBox="0 0 1024 1024" aria-hidden="true">
+                      <path
+                        d="M512 64c60.5 0 119.2 11.8 174.4 35.2 53.3 22.6 101.3 54.9 142.4 96 41.2 41.2 73.5 89.1 96 142.4C948.2 392.8 960 451.5 960 512s-11.8 119.2-35.2 174.4c-22.6 53.3-54.9 101.3-96 142.4-41.2 41.2-89.1 73.5-142.4 96C631.2 948.2 572.5 960 512 960s-119.2-11.8-174.4-35.2c-53.3-22.6-101.3-54.9-142.4-96-41.2-41.2-73.5-89.1-96-142.4C75.8 631.2 64 572.5 64 512s11.8-119.2 35.2-174.4c22.6-53.3 54.9-101.3 96-142.4 41.2-41.2 89.1-73.5 142.4-96C392.8 75.8 451.5 64 512 64m0-64C229.2 0 0 229.2 0 512s229.2 512 512 512 512-229.2 512-512S794.8 0 512 0z"
+                        fill="currentColor"
+                      />
+                      <path
+                        d="M427 752h-56c-2.2 0-4-1.8-4-4V276c0-2.2 1.8-4 4-4h56c2.2 0 4 1.8 4 4v472c0 2.2-1.8 4-4 4zM652 752h-56c-2.2 0-4-1.8-4-4V276c0-2.2 1.8-4 4-4h56c2.2 0 4 1.8 4 4v472c0 2.2-1.8 4-4 4z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                    <svg v-else viewBox="0 0 1024 1024" aria-hidden="true">
+                      <path
+                        d="M512 64c60.5 0 119.2 11.8 174.4 35.2 53.3 22.6 101.3 54.9 142.4 96 41.2 41.2 73.5 89.1 96 142.4C948.2 392.8 960 451.5 960 512s-11.8 119.2-35.2 174.4c-22.6 53.3-54.9 101.3-96 142.4-41.2 41.2-89.1 73.5-142.4 96C631.2 948.2 572.5 960 512 960s-119.2-11.8-174.4-35.2c-53.3-22.6-101.3-54.9-142.4-96-41.2-41.2-73.5-89.1-96-142.4C75.8 631.2 64 572.5 64 512s11.8-119.2 35.2-174.4c22.6-53.3 54.9-101.3 96-142.4 41.2-41.2 89.1-73.5 142.4-96C392.8 75.8 451.5 64 512 64m0-64C229.2 0 0 229.2 0 512s229.2 512 512 512 512-229.2 512-512S794.8 0 512 0z"
+                        fill="currentColor"
+                      />
+                      <path
+                        d="M809.7 508.5L357.9 259.3c-2.7-1.5-5.9 0.5-5.9 3.5v498.4c0 3 3.3 5 5.9 3.5l451.7-249.2c2.8-1.5 2.8-5.5 0.1-7z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    class="icon-btn"
+                    type="button"
+                    :disabled="!hasConfig || !duration"
+                    aria-label="快进 5 秒"
+                    @click="seekBySeconds(5)"
+                  >
+                    <svg viewBox="0 0 1024 1024" aria-hidden="true">
+                      <path
+                        d="M0 512c0 282.8 229.2 512 512 512s512-229.2 512-512S794.8 0 512 0 0 229.2 0 512z m99.2 174.4C75.8 631.2 64 572.5 64 512s11.8-119.2 35.2-174.4c22.6-53.3 54.9-101.3 96-142.4 41.2-41.2 89.1-73.5 142.4-96C392.8 75.8 451.5 64 512 64s119.2 11.8 174.4 35.2c53.3 22.6 101.3 54.9 142.4 96 41.2 41.2 73.5 89.1 96 142.4C948.2 392.8 960 451.5 960 512s-11.8 119.2-35.2 174.4c-22.6 53.3-54.9 101.3-96 142.4-41.2 41.2-89.1 73.5-142.4 96C631.2 948.2 572.5 960 512 960s-119.2-11.8-174.4-35.2c-53.3-22.6-101.3-54.9-142.4-96-41.2-41.2-73.5-89.1-96-142.4z"
+                        fill="currentColor"
+                      />
+                      <path
+                        d="M256 305.3v413.3c0 6.8 8 10.5 13.2 6.1L473.1 551v167.7c0 6.8 8 10.5 13.2 6.1L720 525.6V704h64V320h-64v178.4L486.3 299.2c-5.2-4.4-13.2-0.7-13.2 6.1V473L269.2 299.2c-5.2-4.4-13.2-0.7-13.2 6.1z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <div v-else class="right-column spacer" aria-hidden="true"></div>
     </div>
 
     <audio
@@ -667,6 +958,14 @@ onBeforeUnmount(() => {
   flex-direction: row-reverse;
 }
 
+.lyrics-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: calc(100vh - 48px);
+}
+
 .card {
   background: linear-gradient(135deg, rgba(22, 31, 55, 0.9), rgba(18, 23, 38, 0.95));
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -680,7 +979,7 @@ onBeforeUnmount(() => {
   padding: 20px;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 48px);
+  min-height: 0;
 }
 
 .panel-header {
@@ -806,14 +1105,21 @@ h2 {
   height: calc(100vh - 48px);
 }
 
+.right-column.spacer {
+  visibility: hidden;
+}
+
 .info-panel {
   padding: 20px;
   padding-bottom: 10px;
   height: auto;
-  min-height: 180px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+.info-panel.inline {
+  margin: 0;
 }
 
 .info-panel.disabled {
@@ -824,6 +1130,18 @@ h2 {
   display: flex;
   gap: 16px;
   align-items: flex-start;
+}
+
+.info-top.cover-right {
+  flex-direction: row-reverse;
+}
+
+.info-top.compact {
+  align-items: center;
+}
+
+.info-top.no-cover {
+  gap: 0;
 }
 
 .cover {
@@ -837,6 +1155,12 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.info-top.compact .cover {
+  flex: 0 0 96px;
+  max-width: 96px;
+  height: 96px;
 }
 
 .cover img {
@@ -855,6 +1179,10 @@ h2 {
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+}
+
+.info-text.compact {
+  gap: 6px;
 }
 
 .title-row {
@@ -898,7 +1226,7 @@ h2 {
 .info-bottom {
   display: flex;
   flex-direction: column;
-  gap: -5px;
+  gap: 8px;
 }
 
 .time {
@@ -1209,6 +1537,7 @@ h2 {
     flex-direction: column;
   }
 
+  .lyrics-column,
   .lyrics-panel,
   .right-column {
     height: auto;
@@ -1216,6 +1545,10 @@ h2 {
 
   .info-panel {
     height: auto;
+  }
+
+  .right-column.spacer {
+    display: none;
   }
 
 }

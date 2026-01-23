@@ -38,6 +38,11 @@ const progressRenderer = ref('custom')
 const progressFillOpacity = ref(100)
 const progressShimmerDuration = ref(5)
 const progressShimmerDelay = ref(0.5)
+const showCover = ref(true)
+const showSongInfo = ref(true)
+const infoPanelPosition = ref('separate')
+const infoCoverSide = ref('left')
+const showPlaybackControls = ref(true)
 const isColorPickerOpen = ref(false)
 const colorPickerTarget = ref('start')
 const hsvH = ref(190)
@@ -58,18 +63,11 @@ const toastMessage = ref('')
 const toastProgress = ref(100)
 const confirmClear = ref(false)
 const coverPreviewKey = ref(0)
-const isFitOpen = ref(false)
-const isCoverFitOpen = ref(false)
-const isLyricsOpen = ref(false)
-const isTimeOpen = ref(false)
-const isTrackOpen = ref(false)
-const isFillOpen = ref(false)
-const isRendererOpen = ref(false)
 
 const fitOptions = [
-  { value: 'cover', label: '覆盖（cover）' },
-  { value: 'contain', label: '包含（contain）' },
-  { value: 'fill', label: '拉伸（fill）' },
+  { value: 'cover', label: '覆盖' },
+  { value: 'contain', label: '包含' },
+  { value: 'fill', label: '拉伸' },
 ]
 const alignOptions = [
   { value: 'left top', label: '左上' },
@@ -104,8 +102,17 @@ const progressFillOptions = [
   { value: 'gradient', label: '渐变颜色' },
 ]
 const progressRendererOptions = [
-  { value: 'custom', label: '自定义进度条（推荐）' },
-  { value: 'native', label: '原生滑条（已废弃）' },
+  { value: 'custom', label: 'neo进度条' },
+  { value: 'native', label: '原生滑条' },
+]
+const infoPanelPositionOptions = [
+  { value: 'separate', label: '单独一侧' },
+  { value: 'lyrics-top', label: '与歌词同侧（上方）' },
+  { value: 'lyrics-bottom', label: '与歌词同侧（下方）' },
+]
+const infoCoverSideOptions = [
+  { value: 'left', label: '封面在左' },
+  { value: 'right', label: '封面在右' },
 ]
 
 const hasAudio = computed(() => Boolean(audioBlob.value))
@@ -245,6 +252,11 @@ const handleSave = async () => {
     progressFillOpacity: Number(progressFillOpacity.value) || 100,
     progressShimmerDuration: Number(progressShimmerDuration.value) || 5,
     progressShimmerDelay: Number(progressShimmerDelay.value) || 0,
+    showCover: Boolean(showCover.value),
+    showSongInfo: Boolean(showSongInfo.value),
+    infoPanelPosition: infoPanelPosition.value,
+    infoCoverSide: infoCoverSide.value,
+    showPlaybackControls: Boolean(showPlaybackControls.value),
     updatedAt: Date.now(),
   }
 
@@ -306,6 +318,9 @@ const handleClear = async () => {
     progressFillOpacity.value = 100
     progressShimmerDuration.value = 5
     progressShimmerDelay.value = 0.5
+    showCover.value = true
+    infoPanelPosition.value = 'separate'
+    showPlaybackControls.value = true
     status.value = '配置已清除'
     confirmClear.value = false
     if (clearTimer) {
@@ -323,26 +338,8 @@ const goPlayer = () => {
   router.push('/')
 }
 
-const toggleFit = () => {
-  isFitOpen.value = !isFitOpen.value
-}
-
-const selectFit = (value) => {
-  bgFit.value = value
-  isFitOpen.value = false
-}
-
 const selectBgAlign = (value) => {
   bgAlign.value = value
-}
-
-const toggleCoverFit = () => {
-  isCoverFitOpen.value = !isCoverFitOpen.value
-}
-
-const selectCoverFit = (value) => {
-  coverFit.value = value
-  isCoverFitOpen.value = false
 }
 
 const selectCoverAlign = (value) => {
@@ -372,51 +369,6 @@ const getAlignIcon = (value) => {
     default:
       return '●'
   }
-}
-
-const toggleLyrics = () => {
-  isLyricsOpen.value = !isLyricsOpen.value
-}
-
-const selectLyrics = (value) => {
-  lyricsPosition.value = value
-  isLyricsOpen.value = false
-}
-
-const toggleTimeLayout = () => {
-  isTimeOpen.value = !isTimeOpen.value
-}
-
-const selectTimeLayout = (value) => {
-  timeLayout.value = value
-  isTimeOpen.value = false
-}
-
-const toggleTrackStyle = () => {
-  isTrackOpen.value = !isTrackOpen.value
-}
-
-const selectTrackStyle = (value) => {
-  progressTrackStyle.value = value
-  isTrackOpen.value = false
-}
-
-const toggleFillMode = () => {
-  isFillOpen.value = !isFillOpen.value
-}
-
-const selectFillMode = (value) => {
-  progressFillMode.value = value
-  isFillOpen.value = false
-}
-
-const toggleRenderer = () => {
-  isRendererOpen.value = !isRendererOpen.value
-}
-
-const selectRenderer = (value) => {
-  progressRenderer.value = value
-  isRendererOpen.value = false
 }
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
@@ -615,15 +567,6 @@ const hueCursorStyle = computed(() => ({
 const onDocumentClick = (event) => {
   const target = event.target
   if (!(target instanceof HTMLElement)) return
-  if (!target.closest('.select')) {
-    isFitOpen.value = false
-    isCoverFitOpen.value = false
-    isLyricsOpen.value = false
-    isTimeOpen.value = false
-    isTrackOpen.value = false
-    isFillOpen.value = false
-    isRendererOpen.value = false
-  }
   if (!target.closest('.color-picker') && !target.closest('.color-row')) {
     isColorPickerOpen.value = false
   }
@@ -667,6 +610,11 @@ onMounted(async () => {
     progressFillOpacity.value = stored.progressFillOpacity ?? 100
     progressShimmerDuration.value = stored.progressShimmerDuration ?? 5
     progressShimmerDelay.value = stored.progressShimmerDelay ?? 0.5
+    showCover.value = stored.showCover ?? true
+    showSongInfo.value = stored.showSongInfo ?? true
+    infoPanelPosition.value = stored.infoPanelPosition || 'separate'
+    infoCoverSide.value = stored.infoCoverSide || 'left'
+    showPlaybackControls.value = stored.showPlaybackControls ?? true
   } catch (err) {
     console.error('读取配置失败', err)
   }
@@ -808,27 +756,94 @@ watch(
           </div>
         </section>
 
+        <section class="group" :class="{ 'has-open-select': isColorPickerOpen }">
+          <div class="group-title">音乐信息&控制区</div>
+          <div class="options wide">
+            <div class="option">
+              <label>位置</label>
+              <div
+                class="toggle-group vertical"
+                :style="{
+                  '--count': infoPanelPositionOptions.length,
+                  '--active-index': infoPanelPositionOptions.findIndex((item) => item.value === infoPanelPosition),
+                }"
+              >
+                <span class="toggle-slider" aria-hidden="true"></span>
+                <button
+                  v-for="item in infoPanelPositionOptions"
+                  :key="item.value"
+                  type="button"
+                  :class="['toggle-item', { active: item.value === infoPanelPosition }]"
+                  @click="infoPanelPosition = item.value"
+                >
+                  {{ item.label }}
+                </button>
+              </div>
+            </div>
+            <div class="option">
+              <label>封面位置</label>
+              <div
+                class="toggle-group"
+                :style="{
+                  '--count': infoCoverSideOptions.length,
+                  '--active-index': infoCoverSideOptions.findIndex((item) => item.value === infoCoverSide),
+                }"
+              >
+                <span class="toggle-slider" aria-hidden="true"></span>
+                <button
+                  v-for="item in infoCoverSideOptions"
+                  :key="item.value"
+                  type="button"
+                  :class="['toggle-item', { active: item.value === infoCoverSide }]"
+                  @click="infoCoverSide = item.value"
+                >
+                  {{ item.label }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="toggles">
+            <label class="toggle">
+              <input type="checkbox" v-model="showCover" />
+              <span class="switch"></span>
+              <span>显示歌曲封面</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" v-model="showSongInfo" />
+              <span class="switch"></span>
+              <span>显示歌曲信息</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" v-model="showPlaybackControls" />
+              <span class="switch"></span>
+              <span>显示播放控件</span>
+            </label>
+          </div>
+        </section>
+
         <section class="group">
           <div class="group-title">封面设置</div>
           <div class="cover-config">
             <div class="options wide">
               <div class="option">
                 <label>封面拉伸方式</label>
-                <div class="select" :class="{ open: isCoverFitOpen }">
-                  <button class="select-trigger" type="button" @click.stop="toggleCoverFit">
-                    <span>{{ coverFitOptions.find((item) => item.value === coverFit)?.label }}</span>
-                    <span class="arrow"></span>
+                <div
+                  class="toggle-group"
+                  :style="{
+                    '--count': coverFitOptions.length,
+                    '--active-index': coverFitOptions.findIndex((item) => item.value === coverFit),
+                  }"
+                >
+                  <span class="toggle-slider" aria-hidden="true"></span>
+                  <button
+                    v-for="item in coverFitOptions"
+                    :key="item.value"
+                    type="button"
+                    :class="['toggle-item', { active: item.value === coverFit }]"
+                    @click="coverFit = item.value"
+                  >
+                    {{ item.label }}
                   </button>
-                  <ul v-if="isCoverFitOpen" class="select-menu">
-                    <li
-                      v-for="item in coverFitOptions"
-                      :key="item.value"
-                      :class="['select-item', { active: item.value === coverFit } ]"
-                      @click="selectCoverFit(item.value)"
-                    >
-                      {{ item.label }}
-                    </li>
-                  </ul>
                 </div>
               </div>
               <div class="option">
@@ -864,25 +879,27 @@ watch(
         </section>
 
         <section class="group span-2">
-          <div class="group-title">播放与背景</div>
+          <div class="group-title">背景</div>
           <div class="options wide">
             <div class="option">
               <label>拉伸方式</label>
-              <div class="select" :class="{ open: isFitOpen }">
-                <button class="select-trigger" type="button" @click.stop="toggleFit">
-                  <span>{{ fitOptions.find((item) => item.value === bgFit)?.label }}</span>
-                  <span class="arrow"></span>
+              <div
+                class="toggle-group"
+                :style="{
+                  '--count': fitOptions.length,
+                  '--active-index': fitOptions.findIndex((item) => item.value === bgFit),
+                }"
+              >
+                <span class="toggle-slider" aria-hidden="true"></span>
+                <button
+                  v-for="item in fitOptions"
+                  :key="item.value"
+                  type="button"
+                  :class="['toggle-item', { active: item.value === bgFit }]"
+                  @click="bgFit = item.value"
+                >
+                  {{ item.label }}
                 </button>
-                <ul v-if="isFitOpen" class="select-menu">
-                  <li
-                    v-for="item in fitOptions"
-                    :key="item.value"
-                    :class="['select-item', { active: item.value === bgFit } ]"
-                    @click="selectFit(item.value)"
-                  >
-                    {{ item.label }}
-                  </li>
-                </ul>
               </div>
             </div>
             <div class="option">
@@ -913,88 +930,96 @@ watch(
           </div>
         </section>
 
-        <section class="group">
+        <section class="group" :class="{ 'has-open-select': isColorPickerOpen }">
           <div class="group-title">进度条样式</div>
           <div class="options wide">
             <div class="option">
               <label>渲染方式</label>
-              <div class="select" :class="{ open: isRendererOpen }">
-                <button class="select-trigger" type="button" @click.stop="toggleRenderer">
-                  <span>{{ progressRendererOptions.find((item) => item.value === progressRenderer)?.label }}</span>
-                  <span class="arrow"></span>
+              <div
+                class="toggle-group"
+                :style="{
+                  '--count': progressRendererOptions.length,
+                  '--active-index': progressRendererOptions.findIndex((item) => item.value === progressRenderer),
+                }"
+              >
+                <span class="toggle-slider" aria-hidden="true"></span>
+                <button
+                  v-for="item in progressRendererOptions"
+                  :key="item.value"
+                  type="button"
+                  :class="['toggle-item', { active: item.value === progressRenderer }]"
+                  @click="progressRenderer = item.value"
+                >
+                  {{ item.label }}
                 </button>
-                <ul v-if="isRendererOpen" class="select-menu">
-                  <li
-                    v-for="item in progressRendererOptions"
-                    :key="item.value"
-                    :class="['select-item', { active: item.value === progressRenderer } ]"
-                    @click="selectRenderer(item.value)"
-                  >
-                    {{ item.label }}
-                  </li>
-                </ul>
               </div>
-              <p class="option-note">原生滑条已废弃，建议使用重写的neo滑条。</p>
+              <p class="option-note">原生滑条已废弃，建议使用重写的 neo 滑条。</p>
             </div>
             <div class="option">
               <label>时间显示布局</label>
-              <div class="select" :class="{ open: isTimeOpen }">
-                <button class="select-trigger" type="button" @click.stop="toggleTimeLayout">
-                  <span>{{ timeLayoutOptions.find((item) => item.value === timeLayout)?.label }}</span>
-                  <span class="arrow"></span>
+              <div
+                class="toggle-group"
+                :style="{
+                  '--count': timeLayoutOptions.length,
+                  '--active-index': timeLayoutOptions.findIndex((item) => item.value === timeLayout),
+                }"
+              >
+                <span class="toggle-slider" aria-hidden="true"></span>
+                <button
+                  v-for="item in timeLayoutOptions"
+                  :key="item.value"
+                  type="button"
+                  :class="['toggle-item', { active: item.value === timeLayout }]"
+                  @click="timeLayout = item.value"
+                >
+                  {{ item.label }}
                 </button>
-                <ul v-if="isTimeOpen" class="select-menu">
-                  <li
-                    v-for="item in timeLayoutOptions"
-                    :key="item.value"
-                    :class="['select-item', { active: item.value === timeLayout } ]"
-                    @click="selectTimeLayout(item.value)"
-                  >
-                    {{ item.label }}
-                  </li>
-                </ul>
               </div>
             </div>
             <div class="option">
               <label>进度条外观</label>
-              <div class="select" :class="{ open: isTrackOpen }">
-                <button class="select-trigger" type="button" @click.stop="toggleTrackStyle">
-                  <span>{{ progressTrackOptions.find((item) => item.value === progressTrackStyle)?.label }}</span>
-                  <span class="arrow"></span>
+              <div
+                class="toggle-group"
+                :style="{
+                  '--count': progressTrackOptions.length,
+                  '--active-index': progressTrackOptions.findIndex((item) => item.value === progressTrackStyle),
+                }"
+              >
+                <span class="toggle-slider" aria-hidden="true"></span>
+                <button
+                  v-for="item in progressTrackOptions"
+                  :key="item.value"
+                  type="button"
+                  :class="['toggle-item', { active: item.value === progressTrackStyle }]"
+                  @click="progressTrackStyle = item.value"
+                >
+                  {{ item.label }}
                 </button>
-                <ul v-if="isTrackOpen" class="select-menu">
-                  <li
-                    v-for="item in progressTrackOptions"
-                    :key="item.value"
-                    :class="['select-item', { active: item.value === progressTrackStyle } ]"
-                    @click="selectTrackStyle(item.value)"
-                  >
-                    {{ item.label }}
-                  </li>
-                </ul>
               </div>
             </div>
             <div class="option">
               <label>填充颜色模式</label>
-              <div class="select" :class="{ open: isFillOpen }">
-                <button class="select-trigger" type="button" @click.stop="toggleFillMode">
-                  <span>{{ progressFillOptions.find((item) => item.value === progressFillMode)?.label }}</span>
-                  <span class="arrow"></span>
+              <div
+                class="toggle-group"
+                :style="{
+                  '--count': progressFillOptions.length,
+                  '--active-index': progressFillOptions.findIndex((item) => item.value === progressFillMode),
+                }"
+              >
+                <span class="toggle-slider" aria-hidden="true"></span>
+                <button
+                  v-for="item in progressFillOptions"
+                  :key="item.value"
+                  type="button"
+                  :class="['toggle-item', { active: item.value === progressFillMode }]"
+                  @click="progressFillMode = item.value"
+                >
+                  {{ item.label }}
                 </button>
-                <ul v-if="isFillOpen" class="select-menu">
-                  <li
-                    v-for="item in progressFillOptions"
-                    :key="item.value"
-                    :class="['select-item', { active: item.value === progressFillMode } ]"
-                    @click="selectFillMode(item.value)"
-                  >
-                    {{ item.label }}
-                  </li>
-                </ul>
               </div>
             </div>
             <div class="option">
-              <label>填充起始色</label>
+              <label>渐变起始色</label>
               <div class="color-row">
                 <button
                   class="color-preview"
@@ -1061,7 +1086,7 @@ watch(
               </transition>
             </div>
             <div class="option" v-if="progressFillMode === 'gradient'">
-              <label>填充终止色</label>
+              <label>渐变终止色</label>
               <div class="color-row">
                 <button
                   class="color-preview"
@@ -1128,7 +1153,7 @@ watch(
               </transition>
             </div>
             <div class="option">
-              <label>填充透明度</label>
+              <label>进度条填充不透明度</label>
               <input type="range" min="0" max="100" step="1" v-model.number="progressFillOpacity" />
               <span>{{ progressFillOpacity }}%</span>
             </div>
@@ -1177,21 +1202,23 @@ watch(
           <div class="options wide">
             <div class="option">
               <label>歌词面板位置</label>
-              <div class="select" :class="{ open: isLyricsOpen }">
-                <button class="select-trigger" type="button" @click.stop="toggleLyrics">
-                  <span>{{ lyricsOptions.find((item) => item.value === lyricsPosition)?.label }}</span>
-                  <span class="arrow"></span>
+              <div
+                class="toggle-group"
+                :style="{
+                  '--count': lyricsOptions.length,
+                  '--active-index': lyricsOptions.findIndex((item) => item.value === lyricsPosition),
+                }"
+              >
+                <span class="toggle-slider" aria-hidden="true"></span>
+                <button
+                  v-for="item in lyricsOptions"
+                  :key="item.value"
+                  type="button"
+                  :class="['toggle-item', { active: item.value === lyricsPosition }]"
+                  @click="lyricsPosition = item.value"
+                >
+                  {{ item.label }}
                 </button>
-                <ul v-if="isLyricsOpen" class="select-menu">
-                  <li
-                    v-for="item in lyricsOptions"
-                    :key="item.value"
-                    :class="['select-item', { active: item.value === lyricsPosition } ]"
-                    @click="selectLyrics(item.value)"
-                  >
-                    {{ item.label }}
-                  </li>
-                </ul>
               </div>
             </div>
           </div>
@@ -1241,6 +1268,9 @@ watch(
   padding: 32px;
   position: relative;
   overflow: hidden;
+  --theme-color: #66ccff;
+  --theme-soft: rgba(102, 204, 255, 0.2);
+  --theme-strong: rgba(102, 204, 255, 0.9);
 }
 
 .bg-image {
@@ -1334,6 +1364,12 @@ h1 {
   break-inside: avoid;
   -webkit-column-break-inside: avoid;
   page-break-inside: avoid;
+  position: relative;
+  z-index: 1;
+}
+
+.group.has-open-select {
+  z-index: 100;
 }
 
 .group.emphasis {
@@ -1382,6 +1418,22 @@ h1 {
 
 .group-grid .group:nth-child(6) {
   animation-delay: 270ms;
+}
+
+.group-grid .group:nth-child(7) {
+  animation-delay: 320ms;
+}
+
+.group-grid .group:nth-child(8) {
+  animation-delay: 370ms;
+}
+
+.group-grid .group:nth-child(9) {
+  animation-delay: 420ms;
+}
+
+.group-grid .group:nth-child(10) {
+  animation-delay: 470ms;
 }
 
 .group-title {
@@ -1434,8 +1486,8 @@ h1 {
 .field input:focus,
 .field textarea:focus {
   outline: none;
-  border-color: rgba(56, 189, 248, 0.9);
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+  border-color: var(--theme-strong);
+  box-shadow: 0 0 0 2px var(--theme-soft);
 }
 
 .file-card {
@@ -1450,8 +1502,8 @@ h1 {
 }
 
 .file-card:hover {
-  border-color: #7dd3fc;
-  background: rgba(125, 211, 252, 0.08);
+  border-color: var(--theme-color);
+  background: rgba(102, 204, 255, 0.08);
 }
 
 .file-card:active {
@@ -1549,14 +1601,14 @@ h1 {
 }
 
 .align-item:hover {
-  border-color: rgba(56, 189, 248, 0.7);
+  border-color: rgba(102, 204, 255, 0.7);
 }
 
 .align-item.active {
   color: #0b1224;
-  background: linear-gradient(135deg, #22d3ee, #2563eb);
+  background: linear-gradient(135deg, #66ccff, #66ccff);
   border-color: transparent;
-  box-shadow: 0 10px 24px rgba(34, 211, 238, 0.25);
+  box-shadow: 0 10px 24px rgba(102, 204, 255, 0.25);
 }
 
 .cover-preview {
@@ -1618,7 +1670,7 @@ h1 {
   left: 0;
   bottom: 0;
   height: 3px;
-  background: linear-gradient(90deg, #22d3ee, #2563eb);
+  background: linear-gradient(90deg, #66ccff, #66ccff);
   transition: width 50ms linear;
 }
 
@@ -1651,13 +1703,13 @@ h1 {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #22d3ee;
-  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.2);
+  background: #66ccff;
+  box-shadow: 0 0 0 4px rgba(102, 204, 255, 0.2);
   border: 2px solid rgba(15, 23, 42, 0.8);
 }
 
 .option input[type='range']::-webkit-slider-thumb:hover {
-  background: #38bdf8;
+  background: #66ccff;
 }
 
 .option input[type='range']::-moz-range-track {
@@ -1670,9 +1722,9 @@ h1 {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #22d3ee;
+  background: #66ccff;
   border: 2px solid rgba(15, 23, 42, 0.8);
-  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.2);
+  box-shadow: 0 0 0 4px rgba(102, 204, 255, 0.2);
 }
 
 .color-row {
@@ -1702,8 +1754,8 @@ h1 {
 
 .color-input:focus {
   outline: none;
-  border-color: rgba(56, 189, 248, 0.9);
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+  border-color: var(--theme-strong);
+  box-shadow: 0 0 0 2px var(--theme-soft);
 }
 
 .color-picker {
@@ -1831,13 +1883,13 @@ h1 {
 
 .color-pop-enter-active,
 .color-pop-leave-active {
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .color-pop-enter-from,
 .color-pop-leave-to {
   opacity: 0;
-  transform: translateY(-6px) scale(0.98);
+  transform: translateY(-8px) scale(0.96);
 }
 
 .actions {
@@ -1890,7 +1942,7 @@ h1 {
 }
 
 .toggle input:checked + .switch {
-  background: linear-gradient(135deg, #22d3ee, #2563eb);
+  background: linear-gradient(135deg, #66ccff, #66ccff);
 }
 
 .toggle input:checked + .switch::after {
@@ -1900,7 +1952,7 @@ h1 {
 
 .pill {
   border: 1px solid rgba(255, 255, 255, 0.2);
-  background: linear-gradient(135deg, #22d3ee, #2563eb);
+  background: linear-gradient(135deg, #66ccff, #66ccff);
   color: #0b1224;
   border-radius: 999px;
   padding: 10px 18px;
@@ -1911,7 +1963,7 @@ h1 {
 }
 
 .pill:hover {
-  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 10px 30px rgba(102, 204, 255, 0.35);
 }
 
 .ghost {
@@ -1931,96 +1983,99 @@ h1 {
 }
 
 .ghost:hover {
-  border-color: rgba(56, 189, 248, 0.9);
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+  border-color: var(--theme-strong);
+  box-shadow: 0 0 0 2px var(--theme-soft);
 }
 
-.select {
+.toggle-group {
+  --pad: 6px;
+  --gap: 6px;
+  display: grid;
   position: relative;
-  width: 100%;
-  max-width: 100%;
-}
-
-.select-trigger {
-  width: 100%;
-  text-align: left;
   background: rgba(15, 23, 42, 0.6);
-  color: #e2e8f0;
   border: 1px solid rgba(148, 163, 184, 0.4);
-  border-radius: 10px;
-  padding: 8px 36px 8px 12px;
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
-  box-sizing: border-box;
-  max-width: 100%;
-}
-
-.select-trigger:hover {
-  border-color: rgba(56, 189, 248, 0.7);}
-
-.select.open .select-trigger {
-  border-color: rgba(56, 189, 248, 0.9);
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
-}
-
-.arrow {
-  width: 8px;
-  height: 8px;
-  border-right: 2px solid #7dd3fc;
-  border-bottom: 2px solid #7dd3fc;
-  transform: rotate(45deg);
-  transition: transform 160ms ease;
-  margin-left: 8px;
-}
-
-.select.open .arrow {
-  transform: rotate(-135deg);
-}
-
-.select-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
-  background: rgba(15, 23, 42, 0.95);
-  border: 1px solid rgba(56, 189, 248, 0.25);
   border-radius: 12px;
-  padding: 6px;
-  z-index: 10;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.45);
-  animation: floatIn 140ms ease;
+  padding: var(--pad);
+  gap: var(--gap);
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
-.select-item {
-  padding: 8px 10px;
+.toggle-group:not(.vertical) {
+  grid-template-columns: repeat(var(--count), minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.toggle-group.vertical {
+  grid-template-rows: repeat(var(--count), minmax(44px, auto));
+}
+
+.toggle-slider {
+  position: absolute;
+  z-index: 0;
+  background: var(--theme-color);
   border-radius: 8px;
-  color: #cbd5e1;
+  box-shadow: 0 6px 14px rgba(102, 204, 255, 0.25);
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.toggle-group:not(.vertical) .toggle-slider {
+  top: var(--pad);
+  left: var(--pad);
+  height: calc(100% - var(--pad) * 2);
+  width: calc((100% - var(--pad) * 2 - (var(--count) - 1) * var(--gap)) / var(--count));
+  transform: translateX(calc(var(--active-index) * (100% + var(--gap))));
+}
+
+.toggle-group.vertical .toggle-slider {
+  top: var(--pad);
+  left: var(--pad);
+  right: var(--pad);
+  height: calc((100% - var(--pad) * 2 - (var(--count) - 1) * var(--gap)) / var(--count));
+  transform: translateY(calc(var(--active-index) * (100% + var(--gap))));
+}
+
+.toggle-item {
+  position: relative;
+  z-index: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
+  transition: color 180ms ease, transform 180ms ease;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  min-width: 0;
 }
 
-.select-item:hover {
-  background: rgba(56, 189, 248, 0.15);
-  color: #e0f2fe;
+.toggle-item:hover {
+  color: #e2e8f0;
 }
 
-.select-item.active {
-  background: rgba(56, 189, 248, 0.2);
-  color: #e0f2fe;
+.toggle-item.active {
+  color: #0b1224;
+  font-weight: 700;
+  transform: translateY(-1px);
 }
 
-@keyframes floatIn {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.toggle-group.vertical .toggle-item {
+  padding: 10px 14px;
+  min-height: 44px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 @keyframes flyIn {
@@ -2040,4 +2095,5 @@ h1 {
     align-items: stretch;
   }
 }
+
 </style>
