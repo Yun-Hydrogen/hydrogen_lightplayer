@@ -114,7 +114,7 @@ const deleteTimestamp = async () => {
 
   setTimeout(() => {
     dischargingSet.value.delete(targetIndex)
-  }, 500)
+  }, 750)
 }
 
 const togglePlay = async () => {
@@ -160,6 +160,10 @@ const exportLrc = () => {
 const progressText = computed(() => {
   if (!lines.value.length) return '0 / 0'
   return `${Math.min(currentIndex.value + 1, lines.value.length)} / ${lines.value.length}`
+})
+
+const allCompleted = computed(() => {
+  return lines.value.length > 0 && lines.value.every(line => line.time !== null);
 })
 
 const handleRowPointerDown = (index) => {
@@ -214,17 +218,16 @@ onMounted(() => {
           </div>
         </div>
         <div class="header-actions">
-          <button class="pill" type="button" :disabled="!lines.length" @click="exportLrc">导出 LRC</button>
+          <button class="pill" :class="{ 'export-lrc-button': allCompleted }" type="button" :disabled="!lines.length" @click="exportLrc">导出 LRC</button>
           <button class="ghost" type="button" @click="goSettings">返回配置页</button>
         </div>
       </header>
 
       <div class="content">
-        <section class="group timeline-section">
+        <section class="group timeline-section" :class="{ 'all-completed': allCompleted }">
           <div class="group-title">时间轴列表</div>
           <div ref="timelineRef" class="timeline">
-            <div v-if="!lines.length" class="empty">暂无歌词行，请先生成。</div>
-            <div
+            <div v-if="!lines.length" class="empty">暂无歌词行，请先生成。</div>              <div v-else-if="allCompleted" class="all-completed-notice">🎉 全部完成！</div>            <div
               v-for="(line, index) in lines"
               :key="`${line.text}-${index}`"
               class="timeline-row"
@@ -527,6 +530,20 @@ h1 {
   transition: transform 120ms ease, box-shadow 120ms ease, opacity 160ms ease;
 }
 
+.pill.export-lrc-button {
+  box-shadow: 0 0 15px rgba(102, 204, 255, 0.8);
+  animation: pulse-blue 2s infinite;
+}
+
+@keyframes pulse-blue {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(102, 204, 255, 0.8);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(102, 204, 255, 1);
+  }
+}
+
 .pill:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -653,7 +670,7 @@ h1 {
   border: 1px solid rgba(148, 163, 184, 0.2);
   position: relative;
   overflow: hidden;
-  transition: border-color 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94), background-size 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94), background-color 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94), background-image 800ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition: border-color 750ms cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 750ms cubic-bezier(0.25, 0.46, 0.45, 0.94), background-size 750ms cubic-bezier(0.25, 0.46, 0.45, 0.94), background-color 750ms cubic-bezier(0.25, 0.46, 0.45, 0.94), background-image 750ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
   min-height: 56px;
 }
 
@@ -726,6 +743,14 @@ h1 {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  transition: border-color 0.3s ease;
+}
+
+.timeline-section.all-completed {
+  border-color: rgba(34, 197, 94, 0.7); /* Green glow effect */
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.3);
 }
 
 .timeline-section .timeline {
@@ -737,6 +762,16 @@ h1 {
   padding: 16px;
   text-align: center;
   color: #94a3b8;
+}
+
+.all-completed-notice {
+  padding: 8px;
+  text-align: center;
+  color: #4ade80;
+  font-weight: bold;
+  background: rgba(34, 197, 94, 0.1);
+  border-radius: 8px;
+  margin-bottom: 10px;
 }
 
 @media (max-width: 900px) {
