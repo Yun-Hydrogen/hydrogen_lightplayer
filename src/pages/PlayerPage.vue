@@ -21,6 +21,7 @@ const bgFit = ref('cover')
 const bgAlign = ref('center center')
 const bgDark = ref(0.35)
 const bgBlur = ref(8)
+const bgIsVideo = ref(false)
 const lyricsPosition = ref('left')
 const timeLayout = ref('default')
 const showCurrentTime = ref(true)
@@ -32,6 +33,8 @@ const progressTrackStyle = ref('rounded')
 const progressFillMode = ref('solid')
 const progressFillStart = ref('#22d3ee')
 const progressFillEnd = ref('#2563eb')
+const progressThumbColor = ref('#2563eb')
+const progressThumbOpacity = ref(100)
 const progressRenderer = ref('custom')
 const progressFillOpacity = ref(100)
 const progressShimmerDuration = ref(5)
@@ -40,7 +43,17 @@ const showCover = ref(true)
 const showSongInfo = ref(true)
 const infoPanelPosition = ref('separate')
 const infoCoverSide = ref('left')
+const infoCardBgColor = ref('#121826')
+const infoCardBgOpacity = ref(92)
+const infoCardRadius = ref(18)
+const infoCardBorderWidth = ref(1)
+const infoCardBorderColor = ref('#2f3b52')
+const infoCardBorderOpacity = ref(100)
+const infoCardTiltAngle = ref(0)
+const infoCardShadowStrength = ref(100)
 const showPlaybackControls = ref(true)
+const playbackControlColor = ref('#7dd3fc')
+const playbackControlOpacity = ref(100)
 const progressBarWidth = ref(0)
 const shimmerSize = 42
 const audioEl = ref(null)
@@ -99,15 +112,61 @@ const hexToRgba = (hex, alpha) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
+const isHexColor = (value) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value || '')
+
 const progressStyle = computed(() => ({
   '--progress': `${progress.value}%`,
   '--fill-start': hexToRgba(progressFillColors.value.start, Math.min(1, Math.max(0, progressFillOpacity.value / 100))),
   '--fill-end': hexToRgba(progressFillColors.value.end, Math.min(1, Math.max(0, progressFillOpacity.value / 100))),
-  '--thumb-color': progressFillColors.value.end,
+  '--thumb-color': hexToRgba(
+    isHexColor(progressThumbColor.value) ? progressThumbColor.value : progressFillColors.value.end,
+    Math.min(1, Math.max(0, progressThumbOpacity.value / 100))
+  ),
+  '--thumb-border': `rgba(15, 23, 42, ${Number((0.8 * Math.min(1, Math.max(0, progressThumbOpacity.value / 100))).toFixed(3))})`,
   '--shimmer-duration': `${Math.max(0.5, Number(progressShimmerDuration.value) || 5)}s`,
   '--shimmer-size': `${shimmerSize}px`,
   '--shimmer-end': `${Math.max(0, progressBarWidth.value * (progress.value / 100) - shimmerSize)}px`,
 }))
+
+const infoPanelStyle = computed(() => {
+  const bgColor = isHexColor(infoCardBgColor.value) ? infoCardBgColor.value : '#121826'
+  const borderColor = isHexColor(infoCardBorderColor.value) ? infoCardBorderColor.value : '#2f3b52'
+  const opacity = Math.min(100, Math.max(0, Number(infoCardBgOpacity.value) || 0)) / 100
+  const borderOpacity = Math.min(100, Math.max(0, Number(infoCardBorderOpacity.value) || 0)) / 100
+  const radius = Math.min(48, Math.max(0, Number(infoCardRadius.value) || 0))
+  const borderWidth = Math.min(12, Math.max(0, Number(infoCardBorderWidth.value) || 0))
+  const angle = Math.min(90, Math.max(-90, Number(infoCardTiltAngle.value) || 0))
+  const safeInset = Math.min(80, Math.ceil(Math.abs(angle) * 3))
+  const shadowStrength = Math.min(100, Math.max(0, Number(infoCardShadowStrength.value) || 0)) / 100
+  const shadowAlpha = Number((0.45 * shadowStrength).toFixed(3))
+  const transform = angle
+    ? `perspective(900px) rotateY(${angle}deg)`
+    : 'none'
+
+  return {
+    background: hexToRgba(bgColor, opacity),
+    border: `${borderWidth}px solid ${hexToRgba(borderColor, borderOpacity)}`,
+    borderRadius: `${radius}px`,
+    boxShadow: `0 20px 60px rgba(0, 0, 0, ${shadowAlpha})`,
+    transform,
+    transformOrigin: 'center',
+    transformStyle: 'preserve-3d',
+    width: `calc(100% - ${safeInset}px)`,
+    marginInline: 'auto',
+    '--control-color': hexToRgba(
+      isHexColor(playbackControlColor.value) ? playbackControlColor.value : '#7dd3fc',
+      Math.min(1, Math.max(0, playbackControlOpacity.value / 100))
+    ),
+    '--control-primary': hexToRgba(
+      isHexColor(playbackControlColor.value) ? playbackControlColor.value : '#7dd3fc',
+      Math.min(1, Math.max(0, playbackControlOpacity.value / 100))
+    ),
+    '--control-hover': hexToRgba(
+      isHexColor(playbackControlColor.value) ? playbackControlColor.value : '#bae6fd',
+      Math.min(1, Math.max(0, playbackControlOpacity.value / 100))
+    ),
+  }
+})
 
 const shimmerVisible = computed(() =>
   progressBarWidth.value > 0 &&
@@ -246,6 +305,7 @@ const loadConfig = async () => {
       songDesc.value = '歌曲信息'
       bgUrl.value = ''
       bgName.value = ''
+      bgIsVideo.value = false
       bgFit.value = 'cover'
       bgAlign.value = 'center center'
       bgDark.value = 0.35
@@ -261,6 +321,8 @@ const loadConfig = async () => {
       progressFillMode.value = 'solid'
       progressFillStart.value = '#22d3ee'
       progressFillEnd.value = '#2563eb'
+      progressThumbColor.value = '#2563eb'
+      progressThumbOpacity.value = 100
       progressRenderer.value = 'custom'
       progressFillOpacity.value = 100
       progressShimmerDuration.value = 5
@@ -269,7 +331,17 @@ const loadConfig = async () => {
       showSongInfo.value = true
       infoPanelPosition.value = 'separate'
       infoCoverSide.value = 'left'
+      infoCardBgColor.value = '#121826'
+      infoCardBgOpacity.value = 92
+      infoCardRadius.value = 18
+      infoCardBorderWidth.value = 1
+      infoCardBorderColor.value = '#2f3b52'
+      infoCardBorderOpacity.value = 100
+      infoCardTiltAngle.value = 0
+      infoCardShadowStrength.value = 100
       showPlaybackControls.value = true
+      playbackControlColor.value = '#7dd3fc'
+      playbackControlOpacity.value = 100
       return
     }
 
@@ -293,6 +365,8 @@ const loadConfig = async () => {
     progressFillMode.value = stored.progressFillMode || 'solid'
     progressFillStart.value = stored.progressFillStart || '#22d3ee'
     progressFillEnd.value = stored.progressFillEnd || '#2563eb'
+    progressThumbColor.value = stored.progressThumbColor || stored.progressFillEnd || '#2563eb'
+    progressThumbOpacity.value = stored.progressThumbOpacity ?? 100
     progressRenderer.value = stored.progressRenderer || 'custom'
     progressFillOpacity.value = stored.progressFillOpacity ?? 100
     progressShimmerDuration.value = stored.progressShimmerDuration ?? 5
@@ -301,7 +375,17 @@ const loadConfig = async () => {
     showSongInfo.value = stored.showSongInfo ?? true
     infoPanelPosition.value = stored.infoPanelPosition || 'separate'
     infoCoverSide.value = stored.infoCoverSide || 'left'
+    infoCardBgColor.value = stored.infoCardBgColor || '#121826'
+    infoCardBgOpacity.value = stored.infoCardBgOpacity ?? 92
+    infoCardRadius.value = stored.infoCardRadius ?? 18
+    infoCardBorderWidth.value = stored.infoCardBorderWidth ?? 1
+    infoCardBorderColor.value = stored.infoCardBorderColor || '#2f3b52'
+    infoCardBorderOpacity.value = stored.infoCardBorderOpacity ?? 100
+    infoCardTiltAngle.value = stored.infoCardTiltAngle ?? 0
+    infoCardShadowStrength.value = stored.infoCardShadowStrength ?? 100
     showPlaybackControls.value = stored.showPlaybackControls ?? true
+    playbackControlColor.value = stored.playbackControlColor || '#7dd3fc'
+    playbackControlOpacity.value = stored.playbackControlOpacity ?? 100
     bgName.value = stored.bgName || ''
     bgFit.value = stored.bgFit || 'cover'
     bgAlign.value = stored.bgAlign || 'center center'
@@ -327,9 +411,11 @@ const loadConfig = async () => {
     if (stored.bgBlob) {
       revokeObjectUrl(bgUrl.value)
       bgUrl.value = URL.createObjectURL(stored.bgBlob)
+      bgIsVideo.value = typeof stored.bgBlob.type === 'string' && stored.bgBlob.type.startsWith('video/')
     } else {
       revokeObjectUrl(bgUrl.value)
       bgUrl.value = ''
+      bgIsVideo.value = false
     }
   } catch (err) {
     console.error('读取配置失败', err)
@@ -393,6 +479,12 @@ const bgImageStyle = computed(() => ({
   filter: bgUrl.value ? `blur(${bgBlur.value}px)` : 'none',
 }))
 
+const bgVideoStyle = computed(() => ({
+  objectFit: bgFit.value,
+  objectPosition: bgAlign.value,
+  filter: bgUrl.value ? `blur(${bgBlur.value}px)` : 'none',
+}))
+
 const coverStyle = computed(() => ({
   objectFit: coverFit.value,
   objectPosition: coverAlign.value,
@@ -406,6 +498,7 @@ const lyricsOnRight = computed(() => lyricsPosition.value === 'right')
 const infoInLyrics = computed(() => infoPanelPosition.value !== 'separate')
 const infoAtTop = computed(() => infoPanelPosition.value === 'lyrics-top')
 const infoCoverRight = computed(() => infoCoverSide.value === 'right')
+const coverVisible = computed(() => showCover.value && (showPlaybackControls.value || showSongInfo.value))
 
 const leftTimeVisible = computed(() => {
   if (timeLayout.value === 'swap') return showTotalTime.value
@@ -468,14 +561,25 @@ onBeforeUnmount(() => {
 </script>
 <template>
   <main class="page">
-    <div class="bg-image" :style="bgImageStyle" aria-hidden="true"></div>
+    <video
+      v-if="bgIsVideo && bgUrl"
+      class="bg-video"
+      :src="bgUrl"
+      :style="bgVideoStyle"
+      autoplay
+      muted
+      loop
+      playsinline
+      aria-hidden="true"
+    ></video>
+    <div v-else class="bg-image" :style="bgImageStyle" aria-hidden="true"></div>
     <div class="bg-dim" :style="bgDimStyle" aria-hidden="true"></div>
 
     <div class="layout" :class="{ 'lyrics-right': lyricsOnRight, 'info-inline': infoInLyrics }">
       <section class="lyrics-column">
-        <div v-if="infoInLyrics && infoAtTop" class="info-panel card inline" :class="{ disabled: !hasConfig }">
-          <div class="info-top" :class="{ 'no-cover': !showCover, 'cover-right': infoCoverRight, compact: !showSongInfo }">
-            <div v-if="showCover" class="cover" aria-hidden="true">
+        <div v-if="infoInLyrics && infoAtTop" class="info-panel card inline" :class="{ disabled: !hasConfig }" :style="infoPanelStyle">
+          <div class="info-top" :class="{ 'no-cover': !coverVisible, 'cover-right': infoCoverRight, compact: !showSongInfo }">
+            <div v-if="coverVisible" class="cover" aria-hidden="true">
               <img v-if="coverUrl" :src="coverUrl" alt="音乐封面" :style="coverStyle" />
               <div v-else class="cover-fallback">
                 <svg viewBox="0 0 120 120" aria-hidden="true">
@@ -637,9 +741,9 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <div v-if="infoInLyrics && !infoAtTop" class="info-panel card inline" :class="{ disabled: !hasConfig }">
-          <div class="info-top" :class="{ 'no-cover': !showCover, 'cover-right': infoCoverRight, compact: !showSongInfo }">
-            <div v-if="showCover" class="cover" aria-hidden="true">
+        <div v-if="infoInLyrics && !infoAtTop" class="info-panel card inline" :class="{ disabled: !hasConfig }" :style="infoPanelStyle">
+          <div class="info-top" :class="{ 'no-cover': !coverVisible, 'cover-right': infoCoverRight, compact: !showSongInfo }">
+            <div v-if="coverVisible" class="cover" aria-hidden="true">
               <img v-if="coverUrl" :src="coverUrl" alt="音乐封面" :style="coverStyle" />
               <div v-else class="cover-fallback">
                 <svg viewBox="0 0 120 120" aria-hidden="true">
@@ -774,9 +878,9 @@ onBeforeUnmount(() => {
       </section>
 
       <section v-if="!infoInLyrics" class="right-column">
-        <div class="info-panel card" :class="{ disabled: !hasConfig }">
-          <div class="info-top" :class="{ 'no-cover': !showCover, 'cover-right': infoCoverRight, compact: !showSongInfo }">
-            <div v-if="showCover" class="cover" aria-hidden="true">
+        <div class="info-panel card" :class="{ disabled: !hasConfig }" :style="infoPanelStyle">
+          <div class="info-top" :class="{ 'no-cover': !coverVisible, 'cover-right': infoCoverRight, compact: !showSongInfo }">
+            <div v-if="coverVisible" class="cover" aria-hidden="true">
               <img v-if="coverUrl" :src="coverUrl" alt="音乐封面" :style="coverStyle" />
               <div v-else class="cover-fallback">
                 <svg viewBox="0 0 120 120" aria-hidden="true">
@@ -935,6 +1039,16 @@ onBeforeUnmount(() => {
   position: fixed;
   inset: 0;
   z-index: 0;
+  transform: scale(1.05);
+  transition: filter 200ms ease;
+}
+
+.bg-video {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
   transform: scale(1.05);
   transition: filter 200ms ease;
 }
@@ -1116,6 +1230,8 @@ h2 {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
 }
 
 .info-panel.inline {
@@ -1286,6 +1402,7 @@ h2 {
     var(--fill-end, #22d3ee) 100%
   );
   border-radius: inherit;
+  overflow: hidden;
   z-index: 1;
 }
 
@@ -1321,7 +1438,7 @@ h2 {
   height: 16px;
   border-radius: 50%;
   background: var(--thumb-color, #22d3ee);
-  border: 2px solid rgba(15, 23, 42, 0.8);
+  border: 2px solid var(--thumb-border, rgba(15, 23, 42, 0.8));
   box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.2);
   z-index: 3;
 }
@@ -1427,6 +1544,7 @@ h2 {
   width: var(--progress, 0%);
   transform: translateY(-50%);
   border-radius: inherit;
+  clip-path: inset(0 calc(100% - var(--progress, 0%)) 0 0 round 999px);
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0) 0%,
@@ -1464,13 +1582,14 @@ h2 {
   height: 44px;
   border: none;
   background: transparent;
-  color: #e2e8f0;
+  color: var(--control-color, #e2e8f0);
   display: grid;
   place-items: center;
   cursor: pointer;
   padding: 0;
-  transition: opacity 120ms ease, color 160ms ease;
+  transition: opacity 120ms ease, color 160ms ease, width 120ms ease, height 120ms ease, transform 120ms ease;
 }
+
 
 .icon-btn svg {
   width: 30px;
@@ -1480,11 +1599,15 @@ h2 {
 .icon-btn.primary {
   width: 52px;
   height: 52px;
-  color: #7dd3fc;
+  color: var(--control-primary, #7dd3fc);
 }
 
 .icon-btn:hover {
-  color: #bae6fd;
+  color: var(--control-hover, #bae6fd);
+}
+
+.icon-btn:active {
+  transform: scale(0.94);
 }
 
 .icon-btn:disabled {

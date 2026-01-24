@@ -34,6 +34,8 @@ const progressTrackStyle = ref('rounded')
 const progressFillMode = ref('solid')
 const progressFillStart = ref('#22d3ee')
 const progressFillEnd = ref('#2563eb')
+const progressThumbColor = ref('#2563eb')
+const progressThumbOpacity = ref(100)
 const progressRenderer = ref('custom')
 const progressFillOpacity = ref(100)
 const progressShimmerDuration = ref(5)
@@ -42,7 +44,17 @@ const showCover = ref(true)
 const showSongInfo = ref(true)
 const infoPanelPosition = ref('separate')
 const infoCoverSide = ref('left')
+const infoCardBgColor = ref('#121826')
+const infoCardBgOpacity = ref(92)
+const infoCardRadius = ref(18)
+const infoCardBorderWidth = ref(1)
+const infoCardBorderColor = ref('#2f3b52')
+const infoCardBorderOpacity = ref(100)
+const infoCardTiltAngle = ref(0)
+const infoCardShadowStrength = ref(100)
 const showPlaybackControls = ref(true)
+const playbackControlColor = ref('#7dd3fc')
+const playbackControlOpacity = ref(100)
 const isColorPickerOpen = ref(false)
 const colorPickerTarget = ref('start')
 const hsvH = ref(190)
@@ -119,6 +131,8 @@ const hasAudio = computed(() => Boolean(audioBlob.value))
 const hasLyric = computed(() => Boolean(lyricText.value))
 const hasCover = computed(() => Boolean(coverBlob.value))
 const hasBackground = computed(() => Boolean(bgBlob.value))
+const isBgVideo = computed(() => Boolean(bgBlob.value && typeof bgBlob.value.type === 'string' && bgBlob.value.type.startsWith('video/')))
+const canShowCover = computed(() => showSongInfo.value || showPlaybackControls.value)
 
 const revokeObjectUrl = (url) => {
   if (url) {
@@ -146,6 +160,43 @@ const readFileAsText = (file) =>
 
 let toastTimer = null
 let clearTimer = null
+let previewShimmerTimer = null
+let previewShimmerOffTimer = null
+
+const previewShimmerActive = ref(false)
+
+const stopPreviewShimmerCycle = () => {
+  previewShimmerActive.value = false
+  if (previewShimmerTimer) {
+    clearInterval(previewShimmerTimer)
+    previewShimmerTimer = null
+  }
+  if (previewShimmerOffTimer) {
+    clearTimeout(previewShimmerOffTimer)
+    previewShimmerOffTimer = null
+  }
+}
+
+const startPreviewShimmerCycle = () => {
+  stopPreviewShimmerCycle()
+  if (!progressShimmer.value) return
+  const durationMs = Math.max(500, Number(progressShimmerDuration.value || 5) * 1000)
+  const delayMs = Math.max(0, Number(progressShimmerDelay.value || 0) * 1000)
+  const totalMs = durationMs + delayMs
+  previewShimmerActive.value = true
+  previewShimmerOffTimer = setTimeout(() => {
+    previewShimmerActive.value = false
+  }, durationMs)
+  previewShimmerTimer = setInterval(() => {
+    previewShimmerActive.value = true
+    if (previewShimmerOffTimer) {
+      clearTimeout(previewShimmerOffTimer)
+    }
+    previewShimmerOffTimer = setTimeout(() => {
+      previewShimmerActive.value = false
+    }, durationMs)
+  }, totalMs)
+}
 
 const showToast = (message) => {
   toastMessage.value = message
@@ -201,7 +252,34 @@ const onBackgroundSelect = (event) => {
   bgName.value = file.name
   bgBlob.value = file
   updateBackgroundPreview(file)
-  status.value = '背景图片已读取'
+  status.value = file.type?.startsWith('video/') ? '背景视频已读取' : '背景图片已读取'
+}
+
+const clearAudioResource = () => {
+  audioName.value = ''
+  audioBlob.value = null
+  status.value = '已清除音频'
+}
+
+const clearLyricResource = () => {
+  lyricName.value = ''
+  lyricText.value = ''
+  status.value = '已清除歌词'
+}
+
+const clearCoverResource = () => {
+  coverName.value = ''
+  coverBlob.value = null
+  updateCoverPreview(null)
+  coverPreviewKey.value += 1
+  status.value = '已清除封面'
+}
+
+const clearBackgroundResource = () => {
+  bgName.value = ''
+  bgBlob.value = null
+  updateBackgroundPreview(null)
+  status.value = '已清除背景'
 }
 
 const onCoverSelect = (event) => {
@@ -215,10 +293,7 @@ const onCoverSelect = (event) => {
 }
 
 const handleSave = async () => {
-  if (!audioBlob.value || !lyricText.value) {
-    status.value = '请先选择音频和歌词文件'
-    return
-  }
+  const missingCore = !audioBlob.value || !lyricText.value
 
   const payload = {
     audioName: audioName.value,
@@ -248,6 +323,8 @@ const handleSave = async () => {
     progressFillMode: progressFillMode.value,
     progressFillStart: progressFillStart.value,
     progressFillEnd: progressFillEnd.value,
+    progressThumbColor: progressThumbColor.value,
+    progressThumbOpacity: Number(progressThumbOpacity.value) || 100,
     progressRenderer: progressRenderer.value,
     progressFillOpacity: Number(progressFillOpacity.value) || 100,
     progressShimmerDuration: Number(progressShimmerDuration.value) || 5,
@@ -256,14 +333,24 @@ const handleSave = async () => {
     showSongInfo: Boolean(showSongInfo.value),
     infoPanelPosition: infoPanelPosition.value,
     infoCoverSide: infoCoverSide.value,
+    infoCardBgColor: infoCardBgColor.value,
+    infoCardBgOpacity: Number(infoCardBgOpacity.value) || 0,
+    infoCardRadius: Number(infoCardRadius.value) || 0,
+    infoCardBorderWidth: Number(infoCardBorderWidth.value) || 0,
+    infoCardBorderColor: infoCardBorderColor.value,
+    infoCardBorderOpacity: Number(infoCardBorderOpacity.value) || 0,
+    infoCardTiltAngle: Number(infoCardTiltAngle.value) || 0,
+    infoCardShadowStrength: Number(infoCardShadowStrength.value) || 0,
     showPlaybackControls: Boolean(showPlaybackControls.value),
+    playbackControlColor: playbackControlColor.value,
+    playbackControlOpacity: Number(playbackControlOpacity.value) || 100,
     updatedAt: Date.now(),
   }
 
   try {
     await saveConfig(payload)
-    status.value = '配置已保存'
-    showToast('配置已保存')
+    status.value = missingCore ? '配置已保存（未选择音频或歌词）' : '配置已保存'
+    showToast(status.value)
   } catch (err) {
     console.error('保存配置失败', err)
     status.value = '保存配置失败'
@@ -314,6 +401,8 @@ const handleClear = async () => {
     progressFillMode.value = 'solid'
     progressFillStart.value = '#22d3ee'
     progressFillEnd.value = '#2563eb'
+    progressThumbColor.value = '#2563eb'
+    progressThumbOpacity.value = 100
     progressRenderer.value = 'custom'
     progressFillOpacity.value = 100
     progressShimmerDuration.value = 5
@@ -321,6 +410,10 @@ const handleClear = async () => {
     showCover.value = true
     infoPanelPosition.value = 'separate'
     showPlaybackControls.value = true
+    playbackControlColor.value = '#7dd3fc'
+    playbackControlOpacity.value = 100
+    infoCardShadowStrength.value = 100
+    infoCardBorderOpacity.value = 100
     status.value = '配置已清除'
     confirmClear.value = false
     if (clearTimer) {
@@ -389,6 +482,14 @@ const hexToRgb = (hex) => {
   const b = parseInt(normalized.slice(4, 6), 16)
   if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null
   return { r, g, b }
+}
+
+const isHexColor = (value) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value || '')
+
+const hexToRgbaValue = (hex, alpha, fallback = '#121826') => {
+  const source = isHexColor(hex) ? hex : fallback
+  const rgb = hexToRgb(source) || { r: 18, g: 24, b: 38 }
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`
 }
 
 const rgbToHsv = (r, g, b) => {
@@ -462,10 +563,47 @@ const syncInputsFromHsv = () => {
 }
 
 const applyColorToTarget = () => {
-  if (colorPickerTarget.value === 'start') {
-    progressFillStart.value = hexInput.value
-  } else {
-    progressFillEnd.value = hexInput.value
+  switch (colorPickerTarget.value) {
+    case 'start':
+      progressFillStart.value = hexInput.value
+      break
+    case 'end':
+      progressFillEnd.value = hexInput.value
+      break
+    case 'thumb':
+      progressThumbColor.value = hexInput.value
+      break
+    case 'info-bg':
+      infoCardBgColor.value = hexInput.value
+      break
+    case 'info-border':
+      infoCardBorderColor.value = hexInput.value
+      break
+    case 'control':
+      playbackControlColor.value = hexInput.value
+      break
+    default:
+      progressFillStart.value = hexInput.value
+      break
+  }
+}
+
+const getColorByTarget = (target) => {
+  switch (target) {
+    case 'start':
+      return progressFillStart.value
+    case 'end':
+      return progressFillEnd.value
+    case 'thumb':
+      return progressThumbColor.value
+    case 'info-bg':
+      return infoCardBgColor.value
+    case 'info-border':
+      return infoCardBorderColor.value
+    case 'control':
+      return playbackControlColor.value
+    default:
+      return progressFillStart.value
   }
 }
 
@@ -495,9 +633,14 @@ const applyHex = (value) => {
   applyRgb(rgb.r, rgb.g, rgb.b)
 }
 
+const applyHexToTarget = (value, target) => {
+  colorPickerTarget.value = target
+  applyHex(value)
+}
+
 const openColorPicker = (target) => {
   colorPickerTarget.value = target
-  const current = target === 'start' ? progressFillStart.value : progressFillEnd.value
+  const current = getColorByTarget(target)
   const rgb = hexToRgb(current) || { r: 34, g: 211, b: 238 }
   const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b)
   hsvH.value = hsv.h
@@ -606,6 +749,8 @@ onMounted(async () => {
     progressFillMode.value = stored.progressFillMode || 'solid'
     progressFillStart.value = stored.progressFillStart || '#22d3ee'
     progressFillEnd.value = stored.progressFillEnd || '#2563eb'
+    progressThumbColor.value = stored.progressThumbColor || stored.progressFillEnd || '#2563eb'
+    progressThumbOpacity.value = stored.progressThumbOpacity ?? 100
     progressRenderer.value = stored.progressRenderer || 'custom'
     progressFillOpacity.value = stored.progressFillOpacity ?? 100
     progressShimmerDuration.value = stored.progressShimmerDuration ?? 5
@@ -614,7 +759,17 @@ onMounted(async () => {
     showSongInfo.value = stored.showSongInfo ?? true
     infoPanelPosition.value = stored.infoPanelPosition || 'separate'
     infoCoverSide.value = stored.infoCoverSide || 'left'
+    infoCardBgColor.value = stored.infoCardBgColor || '#121826'
+    infoCardBgOpacity.value = stored.infoCardBgOpacity ?? 92
+    infoCardRadius.value = stored.infoCardRadius ?? 18
+    infoCardBorderWidth.value = stored.infoCardBorderWidth ?? 1
+    infoCardBorderColor.value = stored.infoCardBorderColor || '#2f3b52'
+    infoCardBorderOpacity.value = stored.infoCardBorderOpacity ?? 100
+    infoCardTiltAngle.value = stored.infoCardTiltAngle ?? 0
+    infoCardShadowStrength.value = stored.infoCardShadowStrength ?? 100
     showPlaybackControls.value = stored.showPlaybackControls ?? true
+    playbackControlColor.value = stored.playbackControlColor || '#7dd3fc'
+    playbackControlOpacity.value = stored.playbackControlOpacity ?? 100
   } catch (err) {
     console.error('读取配置失败', err)
   }
@@ -631,6 +786,7 @@ onBeforeUnmount(() => {
     clearTimeout(clearTimer)
     clearTimer = null
   }
+  stopPreviewShimmerCycle()
   revokeObjectUrl(coverUrl.value)
   revokeObjectUrl(bgUrl.value)
 })
@@ -643,9 +799,70 @@ const bgImageStyle = computed(() => ({
   filter: bgUrl.value ? `blur(${bgBlur.value}px)` : 'none',
 }))
 
+const bgVideoStyle = computed(() => ({
+  objectFit: bgFit.value,
+  objectPosition: bgAlign.value,
+  filter: bgUrl.value ? `blur(${bgBlur.value}px)` : 'none',
+}))
+
 const bgDimStyle = computed(() => ({
   background: `rgba(0, 0, 0, ${bgDark.value})`,
 }))
+
+const infoPreviewStyle = computed(() => {
+  const bgColor = isHexColor(infoCardBgColor.value) ? infoCardBgColor.value : '#121826'
+  const borderColor = isHexColor(infoCardBorderColor.value) ? infoCardBorderColor.value : '#2f3b52'
+  const opacity = clamp(Number(infoCardBgOpacity.value) || 0, 0, 100) / 100
+  const radius = clamp(Number(infoCardRadius.value) || 0, 0, 48)
+  const borderWidth = clamp(Number(infoCardBorderWidth.value) || 0, 0, 12)
+  const borderOpacity = clamp(Number(infoCardBorderOpacity.value) || 0, 0, 100) / 100
+  const angle = clamp(Number(infoCardTiltAngle.value) || 0, -90, 90)
+  const shadowStrength = clamp(Number(infoCardShadowStrength.value) || 0, 0, 100) / 100
+  const shadowAlpha = Number((0.45 * shadowStrength).toFixed(3))
+  const transform = angle ? `perspective(700px) rotateY(${angle}deg)` : 'none'
+  const controlAlpha = clamp(Number(playbackControlOpacity.value) || 0, 0, 100) / 100
+
+  return {
+    background: hexToRgbaValue(bgColor, opacity),
+    border: `${borderWidth}px solid ${hexToRgbaValue(borderColor, borderOpacity, '#2f3b52')}`,
+    borderRadius: `${radius}px`,
+    boxShadow: `0 20px 60px rgba(0, 0, 0, ${shadowAlpha})`,
+    transform,
+    transformStyle: 'preserve-3d',
+    '--preview-control-color': hexToRgbaValue(playbackControlColor.value, controlAlpha, '#7dd3fc'),
+  }
+})
+
+const previewProgressStyle = computed(() => {
+  const solid = isHexColor(progressFillStart.value) ? progressFillStart.value : '#22d3ee'
+  const start = isHexColor(progressFillStart.value) ? progressFillStart.value : '#22d3ee'
+  const end = isHexColor(progressFillEnd.value) ? progressFillEnd.value : '#2563eb'
+  const useStart = progressFillMode.value === 'gradient' ? start : solid
+  const useEnd = progressFillMode.value === 'gradient' ? end : solid
+  const fillOpacity = clamp(Number(progressFillOpacity.value) || 0, 0, 100) / 100
+  const thumbColor = isHexColor(progressThumbColor.value) ? progressThumbColor.value : useEnd
+  const thumbOpacity = clamp(Number(progressThumbOpacity.value) || 0, 0, 100) / 100
+  const duration = Math.max(0.5, Number(progressShimmerDuration.value) || 5)
+  const delay = Math.max(0, Number(progressShimmerDelay.value) || 0)
+
+  return {
+    '--preview-fill-start': hexToRgbaValue(useStart, fillOpacity, '#22d3ee'),
+    '--preview-fill-end': hexToRgbaValue(useEnd, fillOpacity, '#2563eb'),
+    '--preview-thumb': hexToRgbaValue(thumbColor, thumbOpacity, useEnd),
+    '--preview-thumb-border': `rgba(15, 23, 42, ${Number((0.8 * thumbOpacity).toFixed(3))})`,
+    '--preview-fill-width': '65%',
+    '--preview-shimmer-duration': `${duration}s`,
+    '--preview-shimmer-delay': `${delay}s`,
+  }
+})
+
+const previewShowHeader = computed(() => showSongInfo.value || (showCover.value && canShowCover.value))
+const previewShowControls = computed(() => showPlaybackControls.value)
+const previewShowOnlyProgress = computed(() => !showSongInfo.value && !previewShowControls.value && !(showCover.value && canShowCover.value))
+const previewLeftVisible = computed(() => (timeLayout.value === 'swap' ? showTotalTime.value : showCurrentTime.value))
+const previewRightVisible = computed(() => (timeLayout.value === 'swap' ? showCurrentTime.value : showTotalTime.value))
+const previewLeftTime = computed(() => (timeLayout.value === 'swap' ? '03:28' : '01:24'))
+const previewRightTime = computed(() => (timeLayout.value === 'swap' ? '01:24' : '03:28'))
 
 const coverPreviewStyle = computed(() => ({
   objectFit: coverFit.value,
@@ -681,11 +898,39 @@ watch(
     }
   }
 )
+
+watch(
+  [showSongInfo, showPlaybackControls],
+  () => {
+    if (!canShowCover.value && showCover.value) {
+      showCover.value = false
+    }
+  }
+)
+
+watch(
+  [progressShimmer, progressShimmerDuration, progressShimmerDelay],
+  () => {
+    startPreviewShimmerCycle()
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
   <main class="page">
-    <div class="bg-image" :style="bgImageStyle" aria-hidden="true"></div>
+    <video
+      v-if="isBgVideo && bgUrl"
+      class="bg-video"
+      :src="bgUrl"
+      :style="bgVideoStyle"
+      autoplay
+      muted
+      loop
+      playsinline
+      aria-hidden="true"
+    ></video>
+    <div v-else class="bg-image" :style="bgImageStyle" aria-hidden="true"></div>
     <div class="bg-dim" :style="bgDimStyle" aria-hidden="true"></div>
 
     <section class="panel">
@@ -694,7 +939,7 @@ watch(
           <p class="eyebrow">Hydrogen Light Player</p>
           <div class="title-row">
             <h1>播放器配置页</h1>
-            <span class="sub inline">选择本地音频与歌词文件并个性化配置播放器。</span>
+            <span class="sub inline">选择本地音频与歌词文件并个性化配置播放器-所有配置文件和资源均保存在本地</span>
           </div>
         </div>
         <button class="ghost" type="button" @click="goPlayer">返回播放器</button>
@@ -710,6 +955,15 @@ watch(
                 <p class="hint">支持 mp3 / wav / flac</p>
                 <p class="filename" v-if="audioName">{{ audioName }}</p>
               </div>
+              <button
+                v-if="audioName"
+                class="file-clear"
+                type="button"
+                aria-label="清除音频"
+                @click.stop.prevent="clearAudioResource"
+              >
+                ×
+              </button>
               <input type="file" accept="audio/*" @change="onAudioSelect" />
             </label>
 
@@ -719,6 +973,15 @@ watch(
                 <p class="hint">LRC / LYC，包含时间轴</p>
                 <p class="filename" v-if="lyricName">{{ lyricName }}</p>
               </div>
+              <button
+                v-if="lyricName || hasLyric"
+                class="file-clear"
+                type="button"
+                aria-label="清除歌词"
+                @click.stop.prevent="clearLyricResource"
+              >
+                ×
+              </button>
               <input type="file" accept=".lrc,.lyc,text/plain" @change="onLyricSelect" />
             </label>
 
@@ -728,16 +991,34 @@ watch(
                 <p class="hint">png / jpg / webp</p>
                 <p class="filename" v-if="coverName">{{ coverName }}</p>
               </div>
+              <button
+                v-if="coverName || hasCover"
+                class="file-clear"
+                type="button"
+                aria-label="清除封面"
+                @click.stop.prevent="clearCoverResource"
+              >
+                ×
+              </button>
               <input type="file" accept="image/*" @change="onCoverSelect" />
             </label>
 
             <label class="file-card">
               <div>
-                <p class="label">背景图片</p>
-                <p class="hint">png / jpg / webp</p>
+                <p class="label">背景资源</p>
+                <p class="hint">png / jpg / webp / mp4 / webm</p>
                 <p class="filename" v-if="bgName">{{ bgName }}</p>
               </div>
-              <input type="file" accept="image/*" @change="onBackgroundSelect" />
+              <button
+                v-if="bgName || hasBackground"
+                class="file-clear"
+                type="button"
+                aria-label="清除背景"
+                @click.stop.prevent="clearBackgroundResource"
+              >
+                ×
+              </button>
+              <input type="file" accept="image/*,video/*" @change="onBackgroundSelect" />
             </label>
           </div>
         </section>
@@ -801,12 +1082,258 @@ watch(
                 </button>
               </div>
             </div>
+            <div class="option">
+              <label>卡片背景色</label>
+              <div class="color-row">
+                <button
+                  class="color-preview"
+                  type="button"
+                  :style="{ background: infoCardBgColor }"
+                  @click.stop="openColorPicker('info-bg')"
+                ></button>
+                <input
+                  class="color-input"
+                  type="text"
+                  v-model.trim="infoCardBgColor"
+                  @change="applyHexToTarget(infoCardBgColor, 'info-bg')"
+                />
+              </div>
+              <transition name="color-pop">
+                <div
+                  v-if="isColorPickerOpen && colorPickerTarget === 'info-bg'"
+                  class="color-picker"
+                  @click.stop
+                >
+                  <div class="picker-row">
+                    <div
+                      ref="svPanelRef"
+                      class="sv-panel"
+                      :style="svPanelStyle"
+                      @pointerdown="onSvPointerDown"
+                    >
+                      <span class="sv-cursor" :style="svCursorStyle"></span>
+                    </div>
+                    <div
+                      ref="huePanelRef"
+                      class="hue-panel"
+                      @pointerdown="onHuePointerDown"
+                    >
+                      <span class="hue-cursor" :style="hueCursorStyle"></span>
+                    </div>
+                  </div>
+                  <div class="picker-inputs">
+                    <div class="picker-field">
+                      <label>HEX</label>
+                      <input class="color-input" type="text" v-model.trim="hexInput" @change="applyHex(hexInput)" />
+                    </div>
+                    <div class="picker-field">
+                      <label>RGB</label>
+                      <div class="picker-grid">
+                        <input type="number" min="0" max="255" v-model.number="rgbR" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                        <input type="number" min="0" max="255" v-model.number="rgbG" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                        <input type="number" min="0" max="255" v-model.number="rgbB" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                      </div>
+                    </div>
+                    <div class="picker-field">
+                      <label>HSV</label>
+                      <div class="picker-grid">
+                        <input type="number" min="0" max="360" v-model.number="hsvInputH" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                        <input type="number" min="0" max="100" v-model.number="hsvInputS" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                        <input type="number" min="0" max="100" v-model.number="hsvInputV" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                      </div>
+                    </div>
+                  </div>
+                  <div class="picker-actions">
+                    <button class="ghost small" type="button" @click="closeColorPicker">完成</button>
+                  </div>
+                </div>
+              </transition>
+            </div>
+            <div class="option">
+              <label>背景不透明度</label>
+              <input type="range" min="0" max="100" step="1" v-model.number="infoCardBgOpacity" />
+              <span>{{ infoCardBgOpacity }}%</span>
+            </div>
+            <div class="option">
+              <label>圆角半径</label>
+              <input type="range" min="0" max="40" step="1" v-model.number="infoCardRadius" />
+              <span>{{ infoCardRadius }}px</span>
+            </div>
+            <div class="option">
+              <label>边框粗细</label>
+              <input type="range" min="0" max="6" step="1" v-model.number="infoCardBorderWidth" />
+              <span>{{ infoCardBorderWidth }}px</span>
+            </div>
+            <div class="option">
+              <label>边框颜色</label>
+              <div class="color-row">
+                <button
+                  class="color-preview"
+                  type="button"
+                  :style="{ background: infoCardBorderColor }"
+                  @click.stop="openColorPicker('info-border')"
+                ></button>
+                <input
+                  class="color-input"
+                  type="text"
+                  v-model.trim="infoCardBorderColor"
+                  @change="applyHexToTarget(infoCardBorderColor, 'info-border')"
+                />
+              </div>
+              <transition name="color-pop">
+                <div
+                  v-if="isColorPickerOpen && colorPickerTarget === 'info-border'"
+                  class="color-picker"
+                  @click.stop
+                >
+                  <div class="picker-row">
+                    <div
+                      ref="svPanelRef"
+                      class="sv-panel"
+                      :style="svPanelStyle"
+                      @pointerdown="onSvPointerDown"
+                    >
+                      <span class="sv-cursor" :style="svCursorStyle"></span>
+                    </div>
+                    <div
+                      ref="huePanelRef"
+                      class="hue-panel"
+                      @pointerdown="onHuePointerDown"
+                    >
+                      <span class="hue-cursor" :style="hueCursorStyle"></span>
+                    </div>
+                  </div>
+                  <div class="picker-inputs">
+                    <div class="picker-field">
+                      <label>HEX</label>
+                      <input class="color-input" type="text" v-model.trim="hexInput" @change="applyHex(hexInput)" />
+                    </div>
+                    <div class="picker-field">
+                      <label>RGB</label>
+                      <div class="picker-grid">
+                        <input type="number" min="0" max="255" v-model.number="rgbR" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                        <input type="number" min="0" max="255" v-model.number="rgbG" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                        <input type="number" min="0" max="255" v-model.number="rgbB" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                      </div>
+                    </div>
+                    <div class="picker-field">
+                      <label>HSV</label>
+                      <div class="picker-grid">
+                        <input type="number" min="0" max="360" v-model.number="hsvInputH" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                        <input type="number" min="0" max="100" v-model.number="hsvInputS" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                        <input type="number" min="0" max="100" v-model.number="hsvInputV" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                      </div>
+                    </div>
+                  </div>
+                  <div class="picker-actions">
+                    <button class="ghost small" type="button" @click="closeColorPicker">完成</button>
+                  </div>
+                </div>
+              </transition>
+            </div>
+            <div class="option">
+              <label>边框不透明度</label>
+              <input type="range" min="0" max="100" step="1" v-model.number="infoCardBorderOpacity" />
+              <span>{{ infoCardBorderOpacity }}%</span>
+            </div>
+            <div class="option">
+              <label>播放控件主题色</label>
+              <div class="color-row">
+                <button
+                  class="color-preview"
+                  type="button"
+                  :style="{ background: playbackControlColor }"
+                  @click.stop="openColorPicker('control')"
+                ></button>
+                <input
+                  class="color-input"
+                  type="text"
+                  v-model.trim="playbackControlColor"
+                  @change="applyHexToTarget(playbackControlColor, 'control')"
+                />
+              </div>
+              <transition name="color-pop">
+                <div
+                  v-if="isColorPickerOpen && colorPickerTarget === 'control'"
+                  class="color-picker"
+                  @click.stop
+                >
+                  <div class="picker-row">
+                    <div
+                      ref="svPanelRef"
+                      class="sv-panel"
+                      :style="svPanelStyle"
+                      @pointerdown="onSvPointerDown"
+                    >
+                      <span class="sv-cursor" :style="svCursorStyle"></span>
+                    </div>
+                    <div
+                      ref="huePanelRef"
+                      class="hue-panel"
+                      @pointerdown="onHuePointerDown"
+                    >
+                      <span class="hue-cursor" :style="hueCursorStyle"></span>
+                    </div>
+                  </div>
+                  <div class="picker-inputs">
+                    <div class="picker-field">
+                      <label>HEX</label>
+                      <input class="color-input" type="text" v-model.trim="hexInput" @change="applyHex(hexInput)" />
+                    </div>
+                    <div class="picker-field">
+                      <label>RGB</label>
+                      <div class="picker-grid">
+                        <input type="number" min="0" max="255" v-model.number="rgbR" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                        <input type="number" min="0" max="255" v-model.number="rgbG" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                        <input type="number" min="0" max="255" v-model.number="rgbB" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                      </div>
+                    </div>
+                    <div class="picker-field">
+                      <label>HSV</label>
+                      <div class="picker-grid">
+                        <input type="number" min="0" max="360" v-model.number="hsvInputH" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                        <input type="number" min="0" max="100" v-model.number="hsvInputS" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                        <input type="number" min="0" max="100" v-model.number="hsvInputV" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                      </div>
+                    </div>
+                  </div>
+                  <div class="picker-actions">
+                    <button class="ghost small" type="button" @click="closeColorPicker">完成</button>
+                  </div>
+                </div>
+              </transition>
+            </div>
+            <div class="option">
+              <label>播放控件不透明度</label>
+              <input type="range" min="0" max="100" step="1" v-model.number="playbackControlOpacity" />
+              <span>{{ playbackControlOpacity }}%</span>
+            </div>
+            <div class="option">
+              <label>阴影强度</label>
+              <input type="range" min="0" max="100" step="1" v-model.number="infoCardShadowStrength" />
+              <span>{{ infoCardShadowStrength }}%</span>
+            </div>
+            <div class="option">
+              <label>3D 旋转角度</label>
+              <input type="range" min="-90" max="90" step="1" v-model.number="infoCardTiltAngle" />
+              <span>{{ infoCardTiltAngle }}°</span>
+            </div>
           </div>
           <div class="toggles">
             <label class="toggle">
-              <input type="checkbox" v-model="showCover" />
+              <input type="checkbox" v-model="showCover" :disabled="!canShowCover" />
               <span class="switch"></span>
               <span>显示歌曲封面</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" v-model="showCurrentTime" />
+              <span class="switch"></span>
+              <span>显示已播放时间</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" v-model="showTotalTime" />
+              <span class="switch"></span>
+              <span>显示总时长</span>
             </label>
             <label class="toggle">
               <input type="checkbox" v-model="showSongInfo" />
@@ -818,6 +1345,42 @@ watch(
               <span class="switch"></span>
               <span>显示播放控件</span>
             </label>
+            <p v-if="!canShowCover" class="option-note">歌曲信息或播放控件至少开启一项，才可以显示封面。</p>
+          </div>
+          <div class="info-preview">
+            <div class="info-preview-card" :style="infoPreviewStyle">
+              <div class="preview-body" :class="{ compact: !showSongInfo, 'cover-right': infoCoverSide === 'right' }">
+                <div
+                  v-if="showCover && canShowCover"
+                  class="preview-cover"
+                  :style="coverPreviewBgStyle"
+                ></div>
+                <div class="preview-content">
+                  <div v-if="showSongInfo" class="preview-text">
+                    <div class="preview-title">{{ songTitle }}</div>
+                    <div class="preview-desc">{{ songDesc }}</div>
+                  </div>
+                  <div
+                    class="preview-progress-row"
+                    :style="previewProgressStyle"
+                    :class="{ 'no-left': !previewLeftVisible, 'no-right': !previewRightVisible }"
+                  >
+                    <span v-if="previewLeftVisible" class="preview-time left">{{ previewLeftTime }}</span>
+                    <div class="preview-progress" :class="{ square: progressTrackStyle === 'square' }">
+                      <div class="preview-progress-fill" :class="{ shimmer: progressShimmer && previewShimmerActive }"></div>
+                      <div v-if="showProgressThumb" class="preview-thumb" :class="{ glow: progressThumbGlow }"></div>
+                    </div>
+                    <span v-if="previewRightVisible" class="preview-time right">{{ previewRightTime }}</span>
+                  </div>
+                  <div v-if="previewShowControls" class="preview-controls">
+                    <span class="preview-dot"></span>
+                    <span class="preview-dot strong"></span>
+                    <span class="preview-dot"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="preview-hint">预览会随以上配置实时更新。</p>
           </div>
         </section>
 
@@ -1153,6 +1716,78 @@ watch(
               </transition>
             </div>
             <div class="option">
+              <label>指示点颜色</label>
+              <div class="color-row">
+                <button
+                  class="color-preview"
+                  type="button"
+                  :style="{ background: progressThumbColor }"
+                  @click.stop="openColorPicker('thumb')"
+                ></button>
+                <input
+                  class="color-input"
+                  type="text"
+                  v-model.trim="progressThumbColor"
+                  @change="applyHexToTarget(progressThumbColor, 'thumb')"
+                />
+              </div>
+              <transition name="color-pop">
+                <div
+                  v-if="isColorPickerOpen && colorPickerTarget === 'thumb'"
+                  class="color-picker"
+                  @click.stop
+                >
+                  <div class="picker-row">
+                    <div
+                      ref="svPanelRef"
+                      class="sv-panel"
+                      :style="svPanelStyle"
+                      @pointerdown="onSvPointerDown"
+                    >
+                      <span class="sv-cursor" :style="svCursorStyle"></span>
+                    </div>
+                    <div
+                      ref="huePanelRef"
+                      class="hue-panel"
+                      @pointerdown="onHuePointerDown"
+                    >
+                      <span class="hue-cursor" :style="hueCursorStyle"></span>
+                    </div>
+                  </div>
+                  <div class="picker-inputs">
+                    <div class="picker-field">
+                      <label>HEX</label>
+                      <input class="color-input" type="text" v-model.trim="hexInput" @change="applyHex(hexInput)" />
+                    </div>
+                    <div class="picker-field">
+                      <label>RGB</label>
+                      <div class="picker-grid">
+                        <input type="number" min="0" max="255" v-model.number="rgbR" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                        <input type="number" min="0" max="255" v-model.number="rgbG" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                        <input type="number" min="0" max="255" v-model.number="rgbB" @change="applyRgb(rgbR, rgbG, rgbB)" />
+                      </div>
+                    </div>
+                    <div class="picker-field">
+                      <label>HSV</label>
+                      <div class="picker-grid">
+                        <input type="number" min="0" max="360" v-model.number="hsvInputH" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                        <input type="number" min="0" max="100" v-model.number="hsvInputS" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                        <input type="number" min="0" max="100" v-model.number="hsvInputV" @change="applyHsv(hsvInputH, hsvInputS, hsvInputV)" />
+                      </div>
+                    </div>
+                  </div>
+                  <div class="picker-actions">
+                    <button class="ghost small" type="button" @click="closeColorPicker">完成</button>
+                  </div>
+                </div>
+              </transition>
+            </div>
+            <div class="option">
+              <label>指示点不透明度</label>
+              <input type="range" min="0" max="100" step="1" v-model.number="progressThumbOpacity" />
+              <span>{{ progressThumbOpacity }}%</span>
+            </div>
+            <div class="option">
               <label>进度条填充不透明度</label>
               <input type="range" min="0" max="100" step="1" v-model.number="progressFillOpacity" />
               <span>{{ progressFillOpacity }}%</span>
@@ -1169,16 +1804,6 @@ watch(
             </div>
           </div>
           <div class="toggles">
-            <label class="toggle">
-              <input type="checkbox" v-model="showCurrentTime" />
-              <span class="switch"></span>
-              <span>显示已播放时间</span>
-            </label>
-            <label class="toggle">
-              <input type="checkbox" v-model="showTotalTime" />
-              <span class="switch"></span>
-              <span>显示总时长</span>
-            </label>
             <label class="toggle">
               <input type="checkbox" v-model="showProgressThumb" />
               <span class="switch"></span>
@@ -1277,6 +1902,16 @@ watch(
   position: fixed;
   inset: 0;
   z-index: 0;
+  transform: scale(1.05);
+  transition: filter 200ms ease;
+}
+
+.bg-video {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
   transform: scale(1.05);
   transition: filter 200ms ease;
 }
@@ -1515,6 +2150,41 @@ h1 {
   inset: 0;
   opacity: 0;
   cursor: pointer;
+  z-index: 0;
+}
+
+.file-card > div {
+  position: relative;
+  z-index: 1;
+}
+
+.file-clear {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: rgba(15, 23, 42, 0.75);
+  color: #e2e8f0;
+  font-size: 18px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.file-clear:hover {
+  transform: scale(1.06);
+  border-color: var(--theme-strong);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.file-clear:active {
+  transform: scale(0.96);
 }
 
 .label {
@@ -1657,8 +2327,8 @@ h1 {
   z-index: 30;
   min-width: 200px;
   padding: 12px 16px 16px;
-  border-radius: 14px;
-  background: rgba(15, 23, 42, 0.92);
+  border-radius: 5px;
+  background: #283151f8;
   border: 1px solid rgba(148, 163, 184, 0.3);
   color: #e2e8f0;
   box-shadow: 0 14px 40px rgba(15, 23, 42, 0.45);
@@ -1816,18 +2486,20 @@ h1 {
 
 .hue-panel {
   position: relative;
+  height: 140px;
   border-radius: 999px;
   background: linear-gradient(
     180deg,
     #ff0000 0%,
-    #ff7f00 16.6%,
-    #ffff00 33.3%,
-    #00ff00 50%,
-    #00ffff 66.6%,
-    #0000ff 83.3%,
-    #ff00ff 100%
+    #ffff00 16.67%,
+    #00ff00 33.33%,
+    #00ffff 50%,
+    #0000ff 66.67%,
+    #ff00ff 83.33%,
+    #ff0000 100%
   );
   border: 1px solid rgba(148, 163, 184, 0.35);
+  box-sizing: border-box;
   cursor: pointer;
 }
 
@@ -1899,14 +2571,202 @@ h1 {
 }
 
 .toggles {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 16px;
   margin-top: 10px;
+  align-items: start;
+}
+
+.info-preview {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.info-preview-card {
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  color: #e2e8f0;
+  backdrop-filter: blur(6px);
+}
+
+.preview-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.preview-body.compact {
+  align-items: center;
+}
+
+.preview-body.cover-right {
+  flex-direction: row-reverse;
+}
+
+.preview-cover {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.preview-content {
+  display: grid;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.preview-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.preview-title {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preview-desc,
+.preview-line {
+  font-size: 12px;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preview-line {
+  color: #94a3b8;
+}
+
+.preview-progress-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.preview-progress-row.no-left {
+  grid-template-columns: 1fr auto;
+}
+
+.preview-progress-row.no-right {
+  grid-template-columns: auto 1fr;
+}
+
+.preview-progress-row.no-left.no-right {
+  grid-template-columns: 1fr;
+}
+
+.preview-time {
+  font-size: 11px;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.preview-progress {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.25);
+  overflow: hidden;
+}
+
+.preview-progress.square {
+  border-radius: 0;
+}
+
+.preview-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--preview-fill-width, 65%);
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    var(--preview-fill-start, #22d3ee) 0%,
+    var(--preview-fill-end, #2563eb) 100%
+  );
+  overflow: hidden;
+}
+
+.preview-progress-fill.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 36px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.7) 50%, rgba(255, 255, 255, 0) 100%);
+  animation: previewShimmer var(--preview-shimmer-duration, 5s) linear infinite;
+}
+
+@keyframes previewShimmer {
+  from {
+    transform: translateX(-36px);
+  }
+  to {
+    transform: translateX(160px);
+  }
+}
+
+.preview-thumb {
+  position: absolute;
+  top: 50%;
+  left: var(--preview-fill-width, 65%);
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--preview-thumb, #22d3ee);
+  border: 2px solid var(--preview-thumb-border, rgba(15, 23, 42, 0.8));
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.18);
+}
+
+.preview-thumb.glow {
+  box-shadow: 0 0 4px rgba(15, 23, 42, 0.3), 0 0 10px var(--preview-thumb, #22d3ee);
+}
+
+.preview-controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  align-items: center;
+}
+
+.preview-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--preview-control-color, rgba(226, 232, 240, 0.45));
+}
+
+.preview-dot.strong {
+  width: 12px;
+  height: 12px;
+  background: var(--preview-control-color, rgba(125, 211, 252, 0.8));
+}
+
+.preview-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #94a3b8;
 }
 
 .toggle {
   display: inline-flex;
+  width: 100%;
   align-items: center;
   gap: 10px;
   color: #cbd5e1;
@@ -2073,6 +2933,7 @@ h1 {
   padding: 10px 14px;
   min-height: 44px;
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
