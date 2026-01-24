@@ -1,10 +1,12 @@
 import { createRouter, createWebHistory, createWebHashHistory } from 'vue-router'
 import PlayerPage from '../pages/PlayerPage.vue'
 import SettingsPage from '../pages/SettingsPage.vue'
+import LrcMakePage from '../pages/LrcMakePage.vue'
 
 const routes = [
   { path: '/', name: 'player', component: PlayerPage },
   { path: '/settings', name: 'settings', component: SettingsPage },
+  { path: '/lrcmake', name: 'lrcmake', component: LrcMakePage },
 ]
 
 const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:'

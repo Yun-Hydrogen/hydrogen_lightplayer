@@ -431,6 +431,10 @@ const goPlayer = () => {
   router.push('/')
 }
 
+const goLrcMake = () => {
+  router.push('/lrcmake')
+}
+
 const selectBgAlign = (value) => {
   bgAlign.value = value
 }
@@ -1020,6 +1024,9 @@ watch(
               </button>
               <input type="file" accept="image/*,video/*" @change="onBackgroundSelect" />
             </label>
+          </div>
+          <div class="uploader-tip">
+            <button class="ghost small" type="button" @click="goLrcMake">没有歌词？自己做一个➡️</button>
           </div>
         </section>
 
@@ -2084,6 +2091,12 @@ h1 {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 12px;
   justify-items: center;
+}
+
+.uploader-tip {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .details {
