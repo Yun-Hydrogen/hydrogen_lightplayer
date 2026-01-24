@@ -8,9 +8,12 @@ const routes = [
 ]
 
 const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:'
+const useHashHistory = typeof window !== 'undefined'
+  ? (isFileProtocol || import.meta.env.BASE_URL === './')
+  : false
 
 const router = createRouter({
-  history: isFileProtocol ? createWebHashHistory() : createWebHistory(import.meta.env.BASE_URL),
+  history: useHashHistory ? createWebHashHistory() : createWebHistory(import.meta.env.BASE_URL),
   routes,
   scrollBehavior() {
     return { top: 0 }
