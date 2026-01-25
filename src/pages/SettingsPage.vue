@@ -1026,7 +1026,10 @@ watch(
             </label>
           </div>
           <div class="uploader-tip">
-            <button class="ghost small" type="button" @click="goLrcMake">没有歌词？自己做一个➡️</button>
+            <div class="button-group">
+              <button class="ghost small" type="button" @click="router.push('/lrcmake')">桌面版歌词制作</button>
+              <button class="ghost small" type="button" @click="router.push('/lrcmakemobile')">移动版歌词制作</button>
+            </div>
           </div>
         </section>
 
@@ -2564,6 +2567,12 @@ h1 {
 .ghost.small {
   padding: 6px 12px;
   font-size: 12px;
+}
+
+.button-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .color-pop-enter-active,

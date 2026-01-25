@@ -201,6 +201,13 @@ onBeforeUnmount(() => {
 
 onMounted(() => {
   window.addEventListener('keydown', onHotkey)
+
+  // If running on a mobile UA or the viewport is narrow, redirect to mobile page
+  const isMobileUA = /Mobi|Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '')
+  const narrow = window.innerWidth <= 600
+  if (isMobileUA || narrow) {
+    router.replace('/lrcmakemobile')
+  }
 })
 
 
@@ -419,6 +426,38 @@ h1 {
   min-height: 0;
 }
 
+@media (max-width: 768px) {
+  .content {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .panel {
+    height: auto;
+    min-height: 100vh;
+    padding: 16px;
+  }
+
+  .header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .upload-row {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .quick-controls .pill,
+  .quick-controls .ghost {
+    width: 100%;
+  }
+}
+
 .right-col {
   display: grid;
   gap: 16px;
@@ -527,7 +566,8 @@ h1 {
   font-weight: 700;
   letter-spacing: 0.01em;
   cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease, opacity 160ms ease;
+  box-shadow: 0 0 0 rgba(102, 204, 255, 0); /* No initial shadow */
+  transition: transform 120ms ease, box-shadow 0.3s ease, opacity 160ms ease;
 }
 
 .pill.export-lrc-button {
@@ -674,6 +714,33 @@ h1 {
   min-height: 56px;
 }
 
+@media (max-width: 768px) {
+  .timeline-row {
+    grid-template-columns: 30px 90px 1fr;
+    grid-template-rows: auto auto;
+    gap: 8px;
+    padding: 10px;
+    min-height: auto;
+  }
+
+  .timeline-row button {
+    grid-column: 1 / -1;
+    justify-self: end;
+    width: auto;
+    min-width: 80px;
+  }
+
+  .index {
+    font-size: 11px;
+  }
+
+  .time-input,
+  .text-input {
+    font-size: 12px;
+    padding: 8px;
+  }
+}
+
 .timeline-row.active {
   border-color: rgba(102, 204, 255, 0.9);
   box-shadow: 0 0 0 2px rgba(102, 204, 255, 0.25), 0 0 16px rgba(102, 204, 255, 0.35);
@@ -774,6 +841,7 @@ h1 {
   margin-bottom: 10px;
 }
 
+/* Existing media query for smaller desktop screens */
 @media (max-width: 900px) {
   .timeline-row {
     grid-template-columns: 32px 100px 1fr;
