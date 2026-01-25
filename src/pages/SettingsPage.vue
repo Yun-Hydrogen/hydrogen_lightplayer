@@ -869,15 +869,11 @@ const previewLeftTime = computed(() => (timeLayout.value === 'swap' ? '03:28' : 
 const previewRightTime = computed(() => (timeLayout.value === 'swap' ? '01:24' : '03:28'))
 
 const coverPreviewStyle = computed(() => ({
+  width: '100%',
+  height: '100%',
+  display: 'block',
   objectFit: coverFit.value,
   objectPosition: coverAlign.value,
-}))
-
-const coverPreviewBgStyle = computed(() => ({
-  backgroundImage: coverUrl.value ? `url(${coverUrl.value})` : 'none',
-  backgroundSize: coverFit.value,
-  backgroundPosition: coverAlign.value,
-  backgroundRepeat: 'no-repeat',
 }))
 
 watch(
@@ -992,7 +988,7 @@ watch(
             <label class="file-card">
               <div>
                 <p class="label">音乐封面</p>
-                <p class="hint">png / jpg / webp</p>
+                <p class="hint">png / jpg / webp / gif</p>
                 <p class="filename" v-if="coverName">{{ coverName }}</p>
               </div>
               <button
@@ -1363,8 +1359,9 @@ watch(
                 <div
                   v-if="showCover && canShowCover"
                   class="preview-cover"
-                  :style="coverPreviewBgStyle"
-                ></div>
+                >
+                  <img v-if="coverUrl" :key="`info-${coverPreviewKey}`" :src="coverUrl" alt="" :style="coverPreviewStyle" />
+                </div>
                 <div class="preview-content">
                   <div v-if="showSongInfo" class="preview-text">
                     <div class="preview-title">{{ songTitle }}</div>
@@ -1437,14 +1434,14 @@ watch(
             </div>
             <div class="cover-preview">
               <div class="preview-frame">
-                <div
+                <img
                   v-if="coverUrl"
                   :key="coverPreviewKey"
                   class="preview-image"
-                  :style="coverPreviewBgStyle"
-                  role="img"
-                  aria-label="封面预览"
-                ></div>
+                  :src="coverUrl"
+                  :style="coverPreviewStyle"
+                  alt="封面预览"
+                />
                 <div v-else class="preview-empty">未选择封面</div>
               </div>
             </div>
@@ -1862,7 +1859,7 @@ watch(
       </div>
 
       <section class="group emphasis">
-        <div class="group-title">保存配置</div>
+        <div class="group-title">保存配置（注：若想再次从播放器主页面回到配置页面，请在地址后面加上/settings）</div>
         <div class="status">
           <span>音频：{{ hasAudio ? '已选择' : '未选择' }}</span>
           <span>歌词：{{ hasLyric ? '已选择' : '未选择' }}</span>

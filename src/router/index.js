@@ -5,10 +5,10 @@ import LrcMakePage from '../pages/LrcMakePage.vue'
 import LrcMakeMobilePage from '../pages/LrcMakeMobilePage.vue'
 
 const routes = [
-  { path: '/', name: 'player', component: PlayerPage },
-  { path: '/settings', name: 'settings', component: SettingsPage },
-  { path: '/lrcmake', name: 'lrcmake', component: LrcMakePage },
-  { path: '/lrcmakemobile', name: 'lrcmakemobile', component: LrcMakeMobilePage },
+  { path: '/', name: 'player', component: PlayerPage, meta: { title: 'Hydrogen Light Player - 播放器' } },
+  { path: '/settings', name: 'settings', component: SettingsPage, meta: { title: 'Hydrogen Light Player - 配置' } },
+  { path: '/lrcmake', name: 'lrcmake', component: LrcMakePage, meta: { title: 'Hydrogen Light Player - 歌词制作' } },
+  { path: '/lrcmakemobile', name: 'lrcmakemobile', component: LrcMakeMobilePage, meta: { title: 'Hydrogen Light Player - 移动端歌词制作' } },
 ]
 
 const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:'
@@ -23,5 +23,15 @@ const router = createRouter({
     return { top: 0 }
   },
 })
+
+// Global navigation guard to set page title
+router.beforeEach((to, from, next) => {
+  if (to.meta.title) {
+    document.title = to.meta.title;
+  } else {
+    document.title = 'Hydrogen Light Player'; // Default title
+  }
+  next();
+});
 
 export default router
